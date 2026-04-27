@@ -124,6 +124,33 @@ inspire update --skill-only   # 仅刷 SKILL.md / references/
 
 如果 `inspire update` 反馈"this build isn't managed by uv tool / pipx"(几乎不应该发生 —— v3.0.3 已修),它会同时打印你这套是怎么装的 + 三条具体的修复路径。
 
+#### 从 v3.0.3 之前的版本升级 (v1.x / v2.x / v3.0.0–v3.0.2)
+
+v3.0.2 之前 `inspire update` 在 `uv tool` 装的环境上会因为 detector bug 拒绝自动升级,v3.0.3 之前 `install.sh` 在 `--ref v<tag>` 时会 404,这两段代码本身在你机器上就是坏的——**修好的版本得另外灌进来一次**。两条路任选:
+
+**最简单:重跑 install.sh**(等价于"原地强制覆盖"):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/realZillionX/InspireSkill/main/scripts/install.sh | bash
+```
+
+脚本对 `uv tool install` / `pipx install` 都加了 `--force`,会直接覆盖旧版本不需要先卸载。SKILL.md 和 references/ 也会一并刷成最新。
+
+**或者直接调底层包管理器**(如果你清楚自己是哪套):
+
+```bash
+# uv tool 用户:
+uv tool upgrade inspire-skill
+
+# pipx 用户:
+pipx upgrade inspire-skill
+
+# 其它 venv / pip install -e 用户:
+pip install -U inspire-skill
+```
+
+落到 v3.0.3 之后 `inspire update` 就能正常自动升所有未来 patch 了,这个迁移每台机器只需要做一次。
+
 ### 完整初始化(安装后必跑)
 
 分**两段**——先配账号(一次),再进每个仓库配项目(每个仓库一次):
