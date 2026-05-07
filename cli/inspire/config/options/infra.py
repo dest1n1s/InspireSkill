@@ -81,15 +81,6 @@ PATHS_OPTIONS: list[ConfigOption] = [
         scope="project",
     ),
     ConfigOption(
-        env_var="INSPIRE_JOB_CACHE",
-        toml_key="paths.job_cache",
-        field_name="job_cache_path",
-        description="Local job cache file path",
-        default="~/.inspire/jobs.json",
-        category="Paths",
-        scope="global",
-    ),
-    ConfigOption(
         env_var="INSP_LOG_CACHE_DIR",
         toml_key="paths.log_cache_dir",
         field_name="log_cache_dir",

@@ -73,7 +73,6 @@ def config_from_env(*, require_target_dir: bool = False) -> Config:
         base_url=os.getenv("INSPIRE_BASE_URL", "https://api.example.com"),
         target_dir=target_dir,
         log_pattern=os.getenv("INSPIRE_LOG_PATTERN", "training_master_*.log"),
-        job_cache_path=os.getenv("INSPIRE_JOB_CACHE", "~/.inspire/jobs.json"),
         timeout=timeout,
         max_retries=max_retries,
         retry_delay=retry_delay,

@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from inspire.config.models import SOURCE_ENV, SOURCE_GLOBAL, SOURCE_PROJECT, ConfigError
+from inspire.config.models import SOURCE_ENV, SOURCE_PROJECT, ConfigError
 from inspire.config.schema import CONFIG_OPTIONS
 
 

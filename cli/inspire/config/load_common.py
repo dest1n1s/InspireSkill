@@ -43,7 +43,6 @@ def _default_config_values() -> dict[str, Any]:
         "base_url": "https://api.example.com",
         "target_dir": None,
         "log_pattern": "training_master_*.log",
-        "job_cache_path": "~/.inspire/jobs.json",
         "timeout": 30,
         "max_retries": 3,
         "retry_delay": 1.0,

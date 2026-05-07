@@ -32,6 +32,7 @@ def _atomic_write_text(target: Path, content: str) -> None:
         os.fsync(f.fileno())
     os.replace(tmp, target)
 
+
 CONFIG_TEMPLATE = """# Inspire CLI Configuration
 # Location: {location_comment}
 #
@@ -58,7 +59,6 @@ retry_delay = 1.0
 [paths]
 target_dir = "/shared/EBM_dev"
 log_pattern = "training_master_*.log"
-job_cache = "~/.inspire/jobs.json"
 log_cache_dir = "~/.inspire/logs"
 
 [github]

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -35,7 +34,6 @@ class Config:
     base_url: str = "https://api.example.com"
     target_dir: Optional[str] = None  # INSPIRE_TARGET_DIR - unified for all Bridge operations
     log_pattern: str = "training_master_*.log"
-    job_cache_path: str = "~/.inspire/jobs.json"
 
     # API settings
     timeout: int = 30
@@ -143,10 +141,6 @@ class Config:
         if not name:
             return None
         return account_config_path(name)
-
-    def get_expanded_cache_path(self) -> str:
-        """Get the job cache path with ~ expanded."""
-        return os.path.expanduser(self.job_cache_path)
 
     @classmethod
     def _find_project_config(cls) -> Path | None:

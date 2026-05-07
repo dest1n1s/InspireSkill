@@ -36,7 +36,6 @@ def patch_hpc_config_and_auth(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
         base_url="https://example.invalid",
         job_project_id="project-default",
         job_image="registry.local/hpc:latest",
-        job_cache_path=str(tmp_path / "jobs.json"),
         log_cache_dir=str(tmp_path / "logs"),
     )
     config.projects = {"alias-project": "project-alias"}

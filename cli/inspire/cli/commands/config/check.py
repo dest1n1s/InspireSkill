@@ -252,7 +252,6 @@ def check_config(ctx: Context, json_output_local: bool) -> None:
             "username": cfg.username,
             "base_url": cfg.base_url,
             "target_dir": cfg.target_dir,
-            "job_cache_path": cfg.get_expanded_cache_path(),
             "log_pattern": cfg.log_pattern,
             "timeout": cfg.timeout,
             "max_retries": cfg.max_retries,
@@ -279,7 +278,6 @@ def check_config(ctx: Context, json_output_local: bool) -> None:
             click.echo(f"Base URL:     {cfg.base_url}")
             click.echo(f"Target dir:   {cfg.target_dir or '(not set - required for logs)'}")
             click.echo(f"Log pattern:  {cfg.log_pattern}")
-            click.echo(f"Job cache:    {cfg.get_expanded_cache_path()}")
             click.echo(f"Timeout:      {cfg.timeout}s")
             click.echo(f"Max retries:  {cfg.max_retries}")
             click.echo(f"Retry delay:  {cfg.retry_delay}s")

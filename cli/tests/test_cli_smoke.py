@@ -75,11 +75,11 @@ def test_run_help_mentions_watch_and_priority_level() -> None:
     assert "priority_level" in result.output
 
 
-def test_job_logs_help_mentions_ssh_fast_path_and_workflow_fallback() -> None:
+def test_job_logs_help_mentions_ssh_only() -> None:
     runner = CliRunner()
     result = runner.invoke(cli_main, ["job", "logs", "--help"])
     assert result.exit_code == 0
-    assert "SSH tunnel fast path" in result.output
-    assert "fetches logs via GitHub workflow" in result.output
+    assert "over SSH" in result.output
+    assert "cached notebook tunnel" in result.output
 
 

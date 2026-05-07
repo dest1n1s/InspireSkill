@@ -31,7 +31,6 @@ from .load_runtime import (
     _validate_required_config,
 )
 
-
 _LEGACY_WORKSPACE_DEFAULT_WARNING_EMITTED = False
 
 

@@ -101,10 +101,7 @@ def workspace_required_hint(config: Config) -> str:
     """
     aliases = sorted((config.workspaces or {}).keys())
     if aliases:
-        return (
-            "pass --workspace <alias> "
-            f"(configured aliases: {', '.join(aliases)})"
-        )
+        return "pass --workspace <alias> " f"(configured aliases: {', '.join(aliases)})"
     return (
         "pass --workspace <alias>. No aliases configured yet — "
         "run `inspire init --discover` to populate [workspaces]"

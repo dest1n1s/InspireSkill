@@ -64,8 +64,6 @@ def _parse_list(value: str) -> list[str]:
     return parts
 
 
-
-
 def parse_value(option: ConfigOption, value: str) -> Any:
     """Parse a string value based on the option's parser."""
     if option.parser:

@@ -36,7 +36,6 @@ def _make_config(tmp_path: Path) -> config_module.Config:
         password="pass",
         base_url="https://example.invalid",
         target_dir=str(tmp_path / "logs"),
-        job_cache_path=str(tmp_path / "jobs.json"),
         log_cache_dir=str(tmp_path / "log_cache"),
         timeout=5,
         max_retries=0,

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 
 from inspire.cli.context import Context, EXIT_JOB_NOT_FOUND, EXIT_VALIDATION_ERROR
 from inspire.cli.utils.errors import exit_with_error
@@ -16,7 +15,13 @@ from inspire.cli.utils.id_resolver import (
 logger = logging.getLogger(__name__)
 
 
-def resolve_job_id(ctx: Context, name: str, *, pick: int | None = None) -> str:
+def resolve_job_id(
+    ctx: Context,
+    name: str,
+    *,
+    pick: int | None = None,
+    all_workspaces: bool = False,
+) -> str:
     """Resolve a training-job name to its internal ``job-<uuid>`` string.
 
     v2.0.0: names only. Ids (``job-…`` / raw UUID / partial hex) are
@@ -24,46 +29,44 @@ def resolve_job_id(ctx: Context, name: str, *, pick: int | None = None) -> str:
     only ever see names don't start guessing with ``rj-`` / ``job-``
     prefixes they saw elsewhere.
 
-    ``pick`` is the 1-indexed ambiguity escape hatch used by destructive
-    cleanup commands (``stop`` / ``delete``).
+    Default scope is the SSO session's workspace. ``all_workspaces=True``
+    widens the search across every value in the account's ``[workspaces]``
+    alias map (populated by ``inspire init --discover``).
     """
     name = (name or "").strip()
     if not name:
         exit_with_error(ctx, "InvalidJobName", "Job name cannot be empty", EXIT_JOB_NOT_FOUND)
 
-    # Reject id-shaped input. Broad-match ``job-`` prefix (not just hex-after-prefix)
-    # for parity with ``_looks_like_platform_id`` in ``id_resolver`` — the user
-    # boundary never accepts ids, so any ``job-...`` string is meant to be a
-    # platform id the agent should have replaced with a name.
-    if name.lower().startswith("job-") or is_full_uuid(name, prefix="job-") or is_partial_id(name, prefix="job-"):
+    if (
+        name.lower().startswith("job-")
+        or is_full_uuid(name, prefix="job-")
+        or is_partial_id(name, prefix="job-")
+    ):
         exit_with_error(
             ctx,
             "ValidationError",
             f"v2 CLI takes a job name, not an id / partial-id ({name!r}).",
             EXIT_VALIDATION_ERROR,
-            hint="Use `inspire job list -A` to find the name and pass that instead.",
+            hint=(
+                "Use `inspire job list -A` to find the name and pass that instead. "
+                "Ids are intentionally not accepted on the v2 CLI."
+            ),
         )
 
-    # Check local cache first so `inspire job list` (cache-backed) and
-    # `inspire job status <name>` agree on which jobs exist — otherwise
-    # agents see a name in list and 404 when they try to use it.
-    matches = _search_job_cache_by_name(name)
+    matches = _search_web_jobs_by_name(name, all_workspaces=all_workspaces)
     if not matches:
-        matches = _search_job_api_by_name(name)
-    # Dedupe by id — cache + API fallback can conceivably surface the same
-    # job_id twice.
-    seen: set[str] = set()
-    matches = [
-        m for m in matches
-        if m[0] and m[0] not in seen and not seen.add(m[0])
-    ]
-    if not matches:
+        scope_hint = (
+            "Use `inspire job list -A` to widen the search across every "
+            "configured workspace alias."
+            if not all_workspaces
+            else "Even with -A no matching job was found."
+        )
         exit_with_error(
             ctx,
             "JobNotFound",
             f"No job with name {name!r} found.",
             EXIT_JOB_NOT_FOUND,
-            hint="Use `inspire job list` (local cache) or `inspire job list -A` (web) to find names.",
+            hint=scope_hint,
         )
     if len(matches) == 1:
         return matches[0][0]
@@ -79,72 +82,101 @@ def resolve_job_id(ctx: Context, name: str, *, pick: int | None = None) -> str:
     return resolve_partial_id(ctx, name, "job", matches, ctx.json_output)
 
 
-def _search_job_cache_by_name(name: str) -> list[tuple[str, str]]:
-    """Exact-name match against the local job cache.
-
-    Mirrors the data source `inspire job list` uses so a name shown there
-    is always resolvable by `inspire job <cmd> <name>` without a web
-    round-trip. The cache path comes from env/default — we don't go
-    through ``Config.from_env`` here because that requires credentials,
-    and resolver helpers must work in the same contexts as the commands
-    they serve.
-    """
-    from inspire.cli.utils.job_cache_api import JobCache
-
-    cache_path = os.path.expanduser(
-        os.getenv("INSPIRE_JOB_CACHE") or "~/.inspire/jobs.json"
-    )
-
-    try:
-        cache = JobCache(cache_path)
-        jobs = cache.list_jobs(limit=0)
-    except (OSError, ValueError, TypeError) as error:
-        logger.debug("Cache-by-name read failed: %s", error)
-        return []
-
-    matches: list[tuple[str, str]] = []
-    for job in jobs:
-        if (job.get("name") or "") == name:
-            jid = job.get("job_id", "")
-            label = job.get("status") or ""
-            if jid:
-                matches.append((jid, label))
-    return matches
-
-
-def _search_job_api_by_name(name: str) -> list[tuple[str, str]]:
+def _search_web_jobs_by_name(
+    name: str,
+    *,
+    all_workspaces: bool,
+) -> list[tuple[str, str]]:
     """Exact-name match against the web API's job list.
 
-    Scope: current user × session workspace, full page. This keeps
-    `inspire job status <name>` from picking up a teammate's same-named
-    training run (which you wouldn't have permission to operate anyway)
-    or getting cut off at the default page of 50.
+    Default scope: the SSO session's workspace × current user. With
+    ``all_workspaces=True``: every value in the account's ``[workspaces]``
+    alias map (curated via ``inspire init --discover``).
 
-    Lets ``SessionExpiredError`` / ``AuthenticationError`` propagate — an
-    auth failure masquerading as "job not found" would send the user in
-    the wrong direction, so we surface the real reason instead.
+    Lets ``SessionExpiredError`` / ``AuthenticationError`` propagate so the
+    real reason surfaces rather than a misleading "job not found".
     """
+    from inspire.config import Config
     from inspire.platform.web.browser_api.jobs import (
         get_current_user,
         list_jobs as web_list_jobs,
     )
+    from inspire.platform.web.session import get_web_session
 
     try:
-        me = get_current_user()
+        session = get_web_session()
+        me = get_current_user(session=session)
         created_by = str(me.get("id") or me.get("user_id") or "").strip() or None
-        items, _ = web_list_jobs(created_by=created_by, page_size=10000)
     except (KeyboardInterrupt, SystemExit):
         raise
     except Exception as error:  # noqa: BLE001
         cls_name = type(error).__name__
         if cls_name in {"SessionExpiredError", "AuthenticationError"}:
             raise
-        logger.debug("Web job name lookup failed for %s: %s", name, error)
+        logger.debug("Web session bootstrap failed for resolver %s: %s", name, error)
+        return []
+
+    if all_workspaces:
+        try:
+            config, _ = Config.from_files_and_env(require_credentials=False)
+        except Exception:  # noqa: BLE001
+            config = None
+        alias_values: list[str] = []
+        if config is not None:
+            alias_values = [str(v).strip() for v in (config.workspaces or {}).values() if v]
+        seen: set[str] = set()
+        workspace_ids: list[str] = []
+        current = str(getattr(session, "workspace_id", "") or "").strip()
+        if current:
+            workspace_ids.append(current)
+            seen.add(current)
+        # Union of [workspaces] alias values AND session.all_workspace_ids:
+        # the alias map is user-curated but may miss SSO-visible workspaces.
+        for wid in alias_values:
+            if wid and wid not in seen:
+                workspace_ids.append(wid)
+                seen.add(wid)
+        for wid in getattr(session, "all_workspace_ids", None) or []:
+            wid_s = str(wid or "").strip()
+            if wid_s and wid_s not in seen:
+                workspace_ids.append(wid_s)
+                seen.add(wid_s)
+    else:
+        current = str(getattr(session, "workspace_id", "") or "").strip()
+        workspace_ids = [current] if current else []
+
+    if not workspace_ids:
         return []
 
     matches: list[tuple[str, str]] = []
-    for job in items:
-        if (job.name or "") == name:
-            label = job.status or ""
-            matches.append((job.job_id, label))
+    seen_ids: set[str] = set()
+    for workspace_id in workspace_ids:
+        try:
+            items, _ = web_list_jobs(
+                workspace_id=workspace_id or None,
+                created_by=created_by,
+                page_size=10000,
+                session=session,
+            )
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception as error:  # noqa: BLE001
+            cls_name = type(error).__name__
+            if cls_name in {"SessionExpiredError", "AuthenticationError"}:
+                raise
+            logger.debug(
+                "Web job lookup failed for %s in workspace %s: %s",
+                name,
+                workspace_id,
+                error,
+            )
+            continue
+        for job in items:
+            if (job.name or "") != name:
+                continue
+            jid = job.job_id or ""
+            if not jid or jid in seen_ids:
+                continue
+            seen_ids.add(jid)
+            matches.append((jid, job.status or ""))
     return matches

@@ -67,6 +67,7 @@ def run_job_create(
         )
         if not selected_workspace_id:
             from inspire.config.workspaces import workspace_required_hint
+
             _handle_error(
                 ctx,
                 "ConfigError",

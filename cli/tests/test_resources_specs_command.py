@@ -15,7 +15,6 @@ def _patch_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         username="user",
         password="pass",
         base_url="https://qz.sii.edu.cn",
-        job_cache_path=str(tmp_path / "jobs.json"),
         log_cache_dir=str(tmp_path / "logs"),
     )
     cfg.workspaces = {
