@@ -29,7 +29,7 @@ inspire image set-default --job <URL> --notebook <URL>
 | 数据流 | GPFS 到处理再到 GPFS | worker 间走 Ray 对象存储 |
 | 结束条件 | `srun` 退出自动结束 | driver 退出才结束 |
 
-放量前先跑接近正式规模的 probe。小规模通过不代表正式规模稳定。
+正式放量前先跑接近生产规模的 probe。小规模通过不代表正式规模稳定。
 
 HPC 示例：
 

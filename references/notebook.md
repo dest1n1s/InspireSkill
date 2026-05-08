@@ -47,8 +47,8 @@ CLI 在容器内跑 bootstrap shell 做两件事：
 
 | 现象 | 处理 |
 | --- | --- |
-| 没能从 `global_public` kit 拿到 rtunnel | 容器里检查 `ls /inspire/hdd/global_public/inspire-skill-bootstrap/v1/rtunnel/linux-amd64/rtunnel`。不存在通常是平台挂载覆盖问题，找 SII 运维。 |
-| `exec format error` / rtunnel 秒退 | kit 中二进制架构不匹配或文件损坏。提 issue 时附 `uname -m` 和 `file /inspire/hdd/global_public/inspire-skill-bootstrap/v1/rtunnel/linux-*/rtunnel`。 |
+| 没能从 `global_public` kit 拿到 rtunnel | 容器里检查 `ls /inspire/hdd/global_public/inspire-skill-bootstrap/v1/rtunnel/linux-amd64/rtunnel`。不存在通常是平台挂载覆盖问题，联系启智平台运维。 |
+| `exec format error` / rtunnel 秒退 | kit 中二进制架构不匹配或文件损坏。上报时附 `uname -m` 和 `file /inspire/hdd/global_public/inspire-skill-bootstrap/v1/rtunnel/linux-*/rtunnel`。 |
 | `dpkg: error processing archive ...` | 容器已有 openssh 组件且版本冲突，可在 Web 终端里手动 `dpkg -i --force-overwrite /inspire/hdd/global_public/inspire-skill-bootstrap/v1/sshd-debs/*.deb`。 |
 | `Privilege separation user sshd does not exist` | 离线 deb 安装没有跑完整 postinst。CLI bootstrap 会补 `useradd -r -M -d /run/sshd -s /usr/sbin/nologin sshd`。 |
 | `/etc/ssh/sshd_config: No such file or directory` | CLI bootstrap 会写最小 config。不要手动写 `Port` / `ListenAddress`，否则会和命令行参数叠加导致 bind 冲突。 |

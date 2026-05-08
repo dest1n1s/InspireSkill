@@ -5,26 +5,26 @@ description: "Execution-first Inspire platform playbook for agents driving the i
 
 # Inspire Skill
 
-把 `inspire` CLI 当黑盒使用。不要读 CLI 源码来猜平台状态；状态、事件、日志、资源余量都通过命令实时查询。
+把 `inspire` CLI 当黑盒工具使用。不要读 CLI 源码来推断平台状态；状态、事件、日志、资源余量全部通过命令实时查询。
 
 ## 1. 运维约束
 
 | 主题 | 约束 |
 | --- | --- |
-| 输出观察面 | Agent 默认使用人类格式。人类输出更短，隐藏低价值 raw ID，适合直接决策。`--json` 只是脚本接口；只有写脚本、接 `jq` 或必须消费结构化字段时才使用。 |
+| 输出观察面 | Agent 默认使用人类格式。人类输出更短，隐藏低价值 raw ID，适合直接决策。`--json` 是脚本接口，只在写脚本、接 `jq` 或必须消费结构化字段时使用。 |
 | 代理配置 | 代理通过 `inspire account add`、账号级 config、`inspire config show` 和 `inspire config check` 管理。任务命令直接写 `inspire <cmd>`，CLI 会读取持久配置。 |
 | 项目路径 | 项目远端路径通过 `inspire init --discover` 写入仓库级 `.inspire/config.toml`。日常命令直接用 notebook name、job name 和配置内路径。 |
-| 实时事实源 | `job list`、`notebook list`、`resources specs/list/nodes` 等状态查询以平台实时结果为准。本地 cache 只能当 SSH 会话、事件副本等非权威辅助信息。 |
+| 实时事实源 | `job list`、`notebook list`、`resources specs` / `list` / `nodes` 等状态查询以平台实时结果为准。本地 cache 只能存放 SSH 会话、事件副本等非权威辅助信息。 |
 | 资源申请 | 先查实时空余，再按真实需求申请。不要因为模型保守而主动缩小规模；只有调度语义、项目配额或实时空余明确不足时才降档。 |
 | 默认 workspace | 默认只主动使用 `CPU 资源空间` 和 `分布式训练空间`。其它 workspace 需要仓库级 `INSPIRE.md` 或用户明确指定。 |
 | 优先级 | `--priority` 接受 1 到 10。1 到 3 是低优先级，4 是普通优先级，5 到 10 是高优先级。需要稳定运行时传 5 或更高，并用 `inspire job status <name>` 核对人类输出中的优先级。 |
-| 排错入口 | 任务 PENDING、CREATING 过久或 FAILED 原因不明时，第一步查 `inspire <res> events <name>`。不要凭猜测重提。 |
+| 排错入口 | 任务 PENDING、CREATING 过久或 FAILED 原因不明时，第一步查 `inspire <res> events <name>`。不要凭猜测重试或重提。 |
 | 清理 | 终态且不再需要的资源用 `<res> delete <name> --yes` 清理；running 先 stop。不确定是否仍有人使用时跳过。 |
-| 大操作 | 共享盘大规模 `mv`、`cp`、`rm` 前先看文件量和大小分布。超过 20 分钟的远程操作用后台任务和 sentinel 文件，不要让 `notebook exec` 长时间同步挂住。 |
+| 大操作 | 共享盘大规模 `mv`、`cp`、`rm` 前先看文件量和大小分布。超过 20 分钟的远程操作使用后台任务 + sentinel 文件，不要让 `notebook exec` 长时间同步挂住。 |
 
 ## 2. CLI 命令查询入口
 
-命令列表、子命令功能和参数说明以 CLI help 为准，不在 SKILL 或 references 中维护硬编码清单。需要确认某个操作时，先查 help，再执行实时查询或提交命令。
+命令列表、子命令功能和参数说明以 CLI help 为准，不在 SKILL 或 references 中维护硬编码清单。需要确认某个操作时，先查 help，再执行实时查询或提交。
 
 ```bash
 inspire --help

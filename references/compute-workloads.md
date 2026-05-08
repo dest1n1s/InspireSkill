@@ -71,7 +71,7 @@ inspire hpc create -n <name>-preprocess \
 #SBATCH --time=*
 ```
 
-`status=SUCCEEDED` 不等于 payload 真跑过。每个新 entrypoint 写唯一 fingerprint 到共享盘，再用同项目 notebook 回读验证。
+`status=SUCCEEDED` 不等于 payload 真跑过。Slurm 作业状态只反映调度器分配和进程退出码，不校验业务产出。每个新 entrypoint 写唯一 fingerprint 到共享盘，再用同项目 notebook 回读确认产出完整。
 
 ## 4. Ray 适用边界
 

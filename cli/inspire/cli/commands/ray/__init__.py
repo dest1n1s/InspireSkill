@@ -24,7 +24,7 @@ from .ray_commands import (
 
 @click.group()
 def ray() -> None:
-    """Manage Ray (弹性计算) jobs — CPU decode + GPU inference streaming pipelines."""
+    """Manage Ray (弹性计算) jobs — elastic clusters with auto-scaling workers."""
 
 
 ray.add_command(list_ray)

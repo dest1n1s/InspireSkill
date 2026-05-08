@@ -3,7 +3,7 @@
 Usage:
     inspire job create --name "pr-123" --quota "4,80,800" --command "bash train.sh"
     inspire job status <name>
-    inspire job logs <name> --tail 100
+    inspire notebook list
     inspire resources list
 """
 
@@ -74,8 +74,8 @@ def _apply_profile_option(
 def main(ctx: Context, json_output: bool, debug: bool) -> None:
     """Inspire Training Platform CLI.
 
-    Interact with the Inspire HPC platform to submit training jobs,
-    monitor their status, and retrieve logs.
+    Interact with the Inspire HPC platform to manage notebooks, submit and
+    monitor training / HPC / Ray jobs, and inspect compute resources.
 
     \b
     Output:
@@ -86,7 +86,7 @@ def main(ctx: Context, json_output: bool, debug: bool) -> None:
     Examples:
         inspire job create --name "pr-123" --quota "4,80,800" --command "bash train.sh"
         inspire job status pr-123
-        inspire job logs pr-123 --tail 100
+        inspire notebook list
         inspire resources list
     """
     ctx.json_output = json_output
