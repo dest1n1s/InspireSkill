@@ -163,7 +163,7 @@ def format_job_status(job_data: Dict[str, Any]) -> str:
 
 
 def format_job_list(jobs: List[Dict[str, Any]]) -> str:
-    """Format job list as a table.
+    """Format job list as a name-first table.
 
     Args:
         jobs: List of job data dictionaries
@@ -172,10 +172,9 @@ def format_job_list(jobs: List[Dict[str, Any]]) -> str:
         Formatted table string
     """
     if not jobs:
-        return "No jobs found in local cache."
+        return "No jobs found."
 
     # Determine dynamic column widths to avoid truncation while keeping the table aligned.
-    job_id_width = max(len("Job ID"), *(len(str(job.get("job_id", "N/A"))) for job in jobs))
     name_width = max(len("Name"), *(len(str(job.get("name", "N/A"))) for job in jobs))
     status_strings = [str(job.get("status", "UNKNOWN")) for job in jobs]
     status_width = (
@@ -184,20 +183,17 @@ def format_job_list(jobs: List[Dict[str, Any]]) -> str:
     created_width = max(len("Created"), *(len(str(job.get("created_at", "N/A"))) for job in jobs))
 
     header_line = (
-        f"{'Job ID':<{job_id_width}} {'Name':<{name_width}} {'Status':<{status_width}} "
-        f"{'Created':<{created_width}}"
+        f"{'Name':<{name_width}}  {'Status':<{status_width}}  {'Created':<{created_width}}"
     )
     separator = "-" * len(header_line)
     lines = ["Jobs", header_line, separator]
 
     for job, status_str in zip(jobs, status_strings):
-        job_id = str(job.get("job_id", "N/A"))
         name = str(job.get("name", "N/A"))
         created = str(job.get("created_at", "N/A"))
 
         lines.append(
-            f"{job_id:<{job_id_width}} {name:<{name_width}} {status_str:<{status_width}} "
-            f"{created:<{created_width}}"
+            f"{name:<{name_width}}  {status_str:<{status_width}}  {created:<{created_width}}"
         )
 
     lines.append(separator)

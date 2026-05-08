@@ -11,6 +11,8 @@ import pytest
 
 from inspire.bridge.tunnel.models import BridgeProfile, TunnelConfig
 from inspire.bridge.tunnel.ssh_exec import run_ssh_command, run_ssh_command_streaming
+from inspire.config import ConfigError
+from inspire.config.path_aliases import resolve_remote_cwd, resolve_remote_path_alias
 
 
 def _stub_resolve(*args: Any, **kwargs: Any) -> tuple[TunnelConfig, BridgeProfile, str]:
@@ -241,3 +243,32 @@ def test_run_ssh_command_streaming_pass_stdin_does_not_write_script(
     assert exit_code == 0
     assert captured["cmd"][-1] == f"bash -l -c {shlex.quote('echo hello')}"
     assert captured["kwargs"]["stdin"] is None
+
+
+def test_remote_cwd_resolves_path_alias() -> None:
+    cwd = resolve_remote_cwd(
+        cwd="me:repo",
+        target_dir="/inspire/hdd/project/topic/alice/default",
+        aliases={"me": "/inspire/ssd/project/topic/alice/"},
+    )
+
+    assert cwd == "/inspire/ssd/project/topic/alice/repo"
+
+
+def test_remote_cwd_rejects_unknown_relative_alias() -> None:
+    with pytest.raises(ConfigError, match="Unknown path alias"):
+        resolve_remote_cwd(
+            cwd="missing:repo",
+            target_dir="/inspire/hdd/project/topic/alice/default",
+            aliases={"me": "/inspire/ssd/project/topic/alice/"},
+        )
+
+
+def test_remote_path_resolves_alias_prefix_for_scp() -> None:
+    path, used_alias = resolve_remote_path_alias(
+        "qb-ilm2.me/checkpoints",
+        {"qb-ilm2.me": "/inspire/qb-ilm2/project/topic/alice/"},
+    )
+
+    assert used_alias is True
+    assert path == "/inspire/qb-ilm2/project/topic/alice/checkpoints"

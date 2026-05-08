@@ -21,7 +21,7 @@ from inspire.cli.context import (
     EXIT_TIMEOUT,
     pass_context,
 )
-from inspire.config import Config, ConfigError, build_env_exports
+from inspire.config import Config, ConfigError, build_env_exports, resolve_remote_cwd
 from inspire.bridge.forge import (
     ForgeAuthError,
     ForgeError,
@@ -639,6 +639,11 @@ def exec_via_workflow(
     help="Timeout in seconds (default: config value)",
 )
 @click.option(
+    "--cwd",
+    default=None,
+    help="Remote working directory or path alias (default: [paths].target_dir)",
+)
+@click.option(
     "stdin_mode",
     "--stdin",
     "--bash-stdin",
@@ -655,6 +660,7 @@ def exec_command(
     download: Optional[str],
     wait: bool,
     timeout: Optional[int],
+    cwd: Optional[str],
     stdin_mode: bool,
 ) -> None:
     """Execute a command on a cached notebook.
@@ -663,12 +669,13 @@ def exec_command(
     artifact options are requested.
 
     NOTEBOOK is the cached notebook name (omit to use the default).
-    COMMAND is the shell command to run remotely (in INSPIRE_TARGET_DIR).
+    COMMAND is the shell command to run remotely (in [paths].target_dir or --cwd).
     Command output (stdout/stderr) is automatically displayed after completion.
 
     \b
     Examples:
         inspire notebook exec my-notebook "uv venv .venv"
+        inspire notebook exec my-notebook --cwd me "pwd"
         inspire notebook exec my-notebook "pip install torch" --timeout 600
         inspire notebook exec my-notebook --stdin -- bash -s < scripts/bootstrap.sh
         inspire notebook exec my-notebook "uv venv .venv" \\
@@ -688,7 +695,12 @@ def exec_command(
     command = _normalize_exec_command(command_parts)
 
     try:
-        config, _ = Config.from_files_and_env(require_target_dir=True, require_credentials=False)
+        config, _ = Config.from_files_and_env(require_target_dir=False, require_credentials=False)
+        config.target_dir = resolve_remote_cwd(
+            cwd=cwd,
+            target_dir=config.target_dir,
+            aliases=config.path_aliases,
+        )
     except ConfigError as e:
         emit_output_error(
             ctx,

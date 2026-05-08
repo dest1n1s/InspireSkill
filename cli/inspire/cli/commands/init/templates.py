@@ -61,6 +61,16 @@ target_dir = "/shared/EBM_dev"
 log_pattern = "training_master_*.log"
 log_cache_dir = "~/.inspire/logs"
 
+[path_aliases]
+# Remote path aliases for notebook exec/shell/scp. `init --discover`
+# fills these from /inspire/<tier>/project/<topic>/<user>/.
+# me = "/inspire/ssd/project/<topic>/<user>/"
+# public = "/inspire/ssd/project/<topic>/public/"
+# global-me = "/inspire/ssd/global_user/<user>/"
+# hdd.me = "/inspire/hdd/project/<topic>/<user>/"
+# ssd.public = "/inspire/ssd/project/<topic>/public/"
+# qb-ilm2.me = "/inspire/qb-ilm2/project/<topic>/<user>/"
+
 [github]
 server = "https://github.com"
 repo = "owner/repo"
@@ -110,12 +120,10 @@ def _init_template_mode(global_flag: bool, project_flag: bool, force: bool) -> N
     """Initialize config using template with placeholders (template mode)."""
     global_path = Config.writable_config_path()
     if global_flag:
-        config_dir = global_path.parent
         config_path = global_path
         location_comment = f"{global_path} (account)"
     elif project_flag:
         config_path = Path.cwd() / PROJECT_CONFIG_DIR / CONFIG_FILENAME
-        config_dir = config_path.parent
         location_comment = "./.inspire/config.toml (project-specific)"
     else:
         click.echo("Where would you like to create the config?")
@@ -126,12 +134,10 @@ def _init_template_mode(global_flag: bool, project_flag: bool, force: bool) -> N
         )
 
         if choice.lower() == "g":
-            config_dir = global_path.parent
             config_path = global_path
             location_comment = "~/.config/inspire/config.toml (global)"
         else:
             config_path = Path.cwd() / PROJECT_CONFIG_DIR / CONFIG_FILENAME
-            config_dir = config_path.parent
             location_comment = "./.inspire/config.toml (project-specific)"
 
     if config_path.exists() and not force:

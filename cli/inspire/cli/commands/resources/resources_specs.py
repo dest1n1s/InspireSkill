@@ -19,7 +19,7 @@ from inspire.config import Config, ConfigError
 from inspire.config.workspaces import select_workspace_id
 from inspire.platform.web import browser_api as browser_api_module
 from inspire.platform.web.session import SessionExpiredError, get_web_session
-
+from .table import render_table
 
 _USAGE_SCHEDULE_TYPES = {
     "notebook": ("SCHEDULE_CONFIG_TYPE_DSW",),
@@ -218,8 +218,7 @@ def _name_to_id(session, config: Config, ws_name: str) -> str:  # noqa: ANN001
     "--workspace",
     default=None,
     help=(
-        "Workspace name (from [workspaces]). Omit to sweep every workspace "
-        "the account can see."
+        "Workspace name (from [workspaces]). Omit to sweep every workspace " "the account can see."
     ),
 )
 @click.option("--group", default=None, help="Filter by compute group name (partial match)")
@@ -319,36 +318,48 @@ def list_specs(
         if multi_ws:
             headers = ("Workspace", "Usage", "Compute Group", "GPU", "CPU", "MemGiB")
             widths = [18, 9, 26, 10, 6, 8]
+            aligns = ["left", "left", "left", "left", "right", "right"]
         else:
             headers = ("Usage", "Compute Group", "GPU", "CPU", "MemGiB")
             widths = [9, 26, 10, 6, 8]
+            aligns = ["left", "left", "left", "right", "right"]
 
         click.echo("")
         click.echo("Resource Specs (for notebook / hpc / ray / job / run create)")
-        click.echo("-" * (sum(widths) + len(widths) - 1))
-        click.echo(" ".join(f"{h:<{w}}" for h, w in zip(headers, widths)))
-        click.echo("-" * (sum(widths) + len(widths) - 1))
+        table_rows = []
         for row in rows:
             gpu_desc = f"{row['gpu_count']}x{row['gpu_type'] or 'CPU'}"
             if multi_ws:
-                cells = [
-                    str(row.get("workspace_name", ""))[: widths[0] - 1],
-                    str(row["usage"])[: widths[1] - 1],
-                    str(row["compute_group_name"])[: widths[2] - 1],
-                    gpu_desc[: widths[3] - 1],
-                    str(row["cpu_count"]),
-                    str(row["memory_size_gib"]),
-                ]
+                table_rows.append(
+                    [
+                        str(row.get("workspace_name", "")),
+                        str(row["usage"]),
+                        str(row["compute_group_name"]),
+                        gpu_desc,
+                        str(row["cpu_count"]),
+                        str(row["memory_size_gib"]),
+                    ]
+                )
             else:
-                cells = [
-                    str(row["usage"])[: widths[0] - 1],
-                    str(row["compute_group_name"])[: widths[1] - 1],
-                    gpu_desc[: widths[2] - 1],
-                    str(row["cpu_count"]),
-                    str(row["memory_size_gib"]),
-                ]
-            click.echo(" ".join(f"{c:<{w}}" for c, w in zip(cells, widths)))
-        click.echo("-" * (sum(widths) + len(widths) - 1))
+                table_rows.append(
+                    [
+                        str(row["usage"]),
+                        str(row["compute_group_name"]),
+                        gpu_desc,
+                        str(row["cpu_count"]),
+                        str(row["memory_size_gib"]),
+                    ]
+                )
+        click.echo(
+            "\n".join(
+                render_table(
+                    headers,
+                    table_rows,
+                    widths,
+                    aligns=aligns,
+                )
+            )
+        )
         if multi_ws:
             ws_summary = ", ".join(sorted({r.get("workspace_name", "") for r in rows}))
             click.echo(f"Workspaces searched: {ws_summary}")

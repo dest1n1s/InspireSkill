@@ -61,8 +61,8 @@ def _apply_profile_option(
     "json_output",
     is_flag=True,
     help=(
-        "Output as JSON (machine-readable). As a global option, place it before the "
-        "subcommand unless that command provides a local --json alias."
+        "Output as JSON for scripts. Agent-facing and interactive use should keep "
+        "the default human format."
     ),
 )
 @click.option(
@@ -78,10 +78,9 @@ def main(ctx: Context, json_output: bool, debug: bool) -> None:
     monitor their status, and retrieve logs.
 
     \b
-    JSON output:
-        Global --json must appear before the subcommand, e.g.:
-            inspire --json hpc status <name>
-        Some subcommands also provide a local --json alias.
+    Output:
+        Default human output is the Agent-facing observation surface.
+        Use JSON only for scripts or structured automation.
 
     \b
     Examples:

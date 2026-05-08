@@ -86,6 +86,7 @@ def _default_config_values() -> dict[str, Any]:
         "project_order": [],
         "compute_groups": [],
         "remote_env": {},
+        "path_aliases": {},
     }
 
 

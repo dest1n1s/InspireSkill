@@ -41,6 +41,7 @@ ACCOUNT_LAYER_DISALLOWED_KEYS = frozenset(
         "paths.log_pattern",
         "github.repo",
         "job.project_id",
+        "path_aliases",
         # job.workspace_id removed entirely in v3.1.0 — kept here would be
         # double-jeopardy (legacy field rejected by load_legacy_workspace_default
         # warning anyway).
@@ -147,7 +148,11 @@ def _apply_account_layer(
 
 def _reject_per_repo_keys(raw: dict[str, Any], account_path: Path) -> None:
     flat = _flatten_toml(raw)
-    offending = sorted(k for k in flat if k in ACCOUNT_LAYER_DISALLOWED_KEYS)
+    offending = sorted(
+        k
+        for k in flat
+        if k in ACCOUNT_LAYER_DISALLOWED_KEYS or k.startswith("path_aliases.")
+    )
     if not offending:
         return
     raise ConfigError(

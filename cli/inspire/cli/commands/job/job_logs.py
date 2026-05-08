@@ -8,9 +8,9 @@ explicitly with ``--notebook``). The log path uses the convention
 re-submitted name shows the most recent run, not a clobbered file. Pass
 ``--remote-log-path`` to override (e.g. for jobs created from the Web UI).
 
-Bulk mode and the legacy GitHub-workflow fallback were removed alongside
-the JobCache deletion: the SSH tunnel kit is universal (cf. SKILL §1.1
-"SSH bootstrap"), and the workflow path was already declared deprecated.
+Bulk mode and the legacy GitHub-workflow fallback were removed. The SSH
+tunnel kit is universal (cf. SKILL §1.1 "SSH bootstrap"), and the
+workflow path was already declared deprecated.
 """
 
 from __future__ import annotations

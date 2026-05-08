@@ -102,7 +102,7 @@ du -sh --max-depth=1 <dir>           # 大小分布
 直觉常错传 `--priority 1` 以为是"高优"——其实是最低档。要高优传 ≥5 任意值。提交后**立刻**：
 
 ```bash
-inspire --json job status <job-id>
+inspire job status <name>
 ```
 
-核对 `priority_level`。若仍为 `LOW`，先 `job stop`，再用 ≥5 的值重提。
+核对人类输出中的优先级。若仍为 LOW，先 `job stop`，再用 ≥5 的值重提。

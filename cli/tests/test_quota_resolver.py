@@ -241,13 +241,26 @@ def test_build_resource_spec_price_shape() -> None:
         cpu_count=20,
         memory_gib=200,
         gpu_type="H200",
-        raw_price={"cpu_info": {"cpu_type": "Intel Xeon"}},
+        raw_price={
+            "cpu_info": {"cpu_type": "Intel Xeon"},
+            "cpu_price_id": "rpc-cpu",
+            "cpu_price_version_id": 1,
+            "gpu_info": {
+                "gpu_type": "NVIDIA_H200_SXM_141G",
+                "gpu_type_display": "NVIDIA H200 (141GB)",
+            },
+            "gpu_price_id": "rpc-gpu",
+            "gpu_price_version_id": 1,
+            "memory_price_id": "rpc-memory",
+            "memory_price_version_id": 1,
+            "total_price_per_hour": 1,
+        },
     )
     payload = build_resource_spec_price(quota=quota)
     assert payload == {
         "cpu_type": "Intel Xeon",
         "cpu_count": 20,
-        "gpu_type": "H200",
+        "gpu_type": "NVIDIA_H200_SXM_141G",
         "gpu_count": 1,
         "memory_size_gib": 200,
         "logic_compute_group_id": "lcg-1",

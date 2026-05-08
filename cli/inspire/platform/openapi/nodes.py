@@ -45,4 +45,52 @@ def list_cluster_nodes(
     raise InspireAPIError(f"Failed to get node list: {error_msg}")
 
 
-__all__ = ["list_cluster_nodes"]
+def _openapi_path(api, suffix: str) -> str:  # noqa: ANN001
+    prefix = getattr(api.endpoints, "_openapi_prefix", "/openapi/v1")
+    return f"{prefix.rstrip('/')}/{suffix.lstrip('/')}"
+
+
+def cluster_basic_info(api) -> Dict[str, Any]:  # noqa: ANN001
+    """Get live cluster summary metadata from OpenAPI."""
+    api._check_authentication()
+    result = api._make_request("GET", _openapi_path(api, "cluster_basic_info"))
+    if result.get("code") == 0:
+        return result
+    error_msg = result.get("message", "Unknown error")
+    raise InspireAPIError(f"Failed to get cluster basic info: {error_msg}")
+
+
+def list_node_dimension(
+    api,  # noqa: ANN001
+    *,
+    logic_compute_group_id: str,
+    workspace_id: Optional[str] = None,
+    page_num: int = 1,
+    page_size: int = -1,
+) -> Dict[str, Any]:
+    """Get live node dimensions for a compute group from OpenAPI."""
+    api._check_authentication()
+    if not logic_compute_group_id:
+        raise ValidationError("logic_compute_group_id cannot be empty")
+    if page_num < 1:
+        raise ValidationError("Page number must be at least 1")
+    if page_size == 0 or page_size < -1:
+        raise ValidationError("Page size must be -1 or a positive integer")
+
+    payload: Dict[str, Any] = {
+        "logic_compute_group_id": logic_compute_group_id,
+        "page_num": page_num,
+        "page_size": page_size,
+        "filter": {"logic_compute_group_id": logic_compute_group_id},
+    }
+    if workspace_id:
+        payload["workspace_id"] = workspace_id
+
+    result = api._make_request("POST", _openapi_path(api, "list_node_dimension"), payload)
+    if result.get("code") == 0:
+        return result
+    error_msg = result.get("message", "Unknown error")
+    raise InspireAPIError(f"Failed to list node dimensions: {error_msg}")
+
+
+__all__ = ["cluster_basic_info", "list_cluster_nodes", "list_node_dimension"]

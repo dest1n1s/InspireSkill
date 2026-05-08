@@ -15,6 +15,12 @@ from inspire.config.models import (
     Config,
     ConfigError,
 )
+from inspire.config.path_aliases import (  # noqa: F401
+    PATH_ALIASES_SECTION,
+    resolve_remote_cwd,
+    resolve_remote_path_alias,
+    write_project_path_alias,
+)
 from inspire.config.schema import (  # noqa: F401
     CATEGORY_ORDER,
     CONFIG_OPTIONS,
@@ -40,6 +46,7 @@ __all__ = [
     "CONFIG_FILENAME",
     "CONFIG_OPTIONS",
     "PROJECT_CONFIG_DIR",
+    "PATH_ALIASES_SECTION",
     "SOURCE_DEFAULT",
     "SOURCE_ENV",
     "SOURCE_GLOBAL",
@@ -66,4 +73,7 @@ __all__ = [
     "get_required_options",
     "get_secret_options",
     "parse_value",
+    "resolve_remote_cwd",
+    "resolve_remote_path_alias",
+    "write_project_path_alias",
 ]

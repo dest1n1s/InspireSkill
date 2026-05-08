@@ -4,7 +4,6 @@ import json
 import os
 import re
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Generator
 
 import pytest
@@ -294,6 +293,24 @@ class TestLayeredConfig:
         cfg, sources = Config.from_files_and_env(require_credentials=False)
         assert cfg.target_dir == "/inspire/test"
         assert sources["target_dir"] == SOURCE_PROJECT
+
+    def test_from_files_and_env_loads_project_path_aliases(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, clean_env: None
+    ) -> None:
+        project_dir = tmp_path / ".inspire"
+        project_dir.mkdir()
+        (project_dir / "config.toml").write_text(
+            "[path_aliases]\n"
+            'me = "/inspire/ssd/project/topic/alice/"\n'
+            'qb-ilm2.public = "/inspire/qb-ilm2/project/topic/public/"\n'
+        )
+        monkeypatch.chdir(tmp_path)
+
+        cfg, sources = Config.from_files_and_env(require_credentials=False)
+
+        assert cfg.path_aliases["me"] == "/inspire/ssd/project/topic/alice/"
+        assert cfg.path_aliases["qb-ilm2.public"] == "/inspire/qb-ilm2/project/topic/public/"
+        assert sources["path_aliases"] == SOURCE_PROJECT
 
     def test_from_files_and_env_env_override(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -910,6 +927,22 @@ class TestInitCommand:
         assert merged_workspaces["custom"] == "ws-custom"
         for alias in ("cpu", "gpu", "internet", "hpc", "whole_node"):
             assert alias not in merged_workspaces
+
+    def test_default_path_aliases_use_selected_tier_project_topic_and_user(self) -> None:
+        from inspire.cli.commands.init.discover import _default_path_aliases
+
+        aliases = _default_path_aliases(
+            account_key="alice",
+            project_topic="topic-a",
+            selected_tier="ssd",
+        )
+
+        assert aliases["me"] == "/inspire/ssd/project/topic-a/alice/"
+        assert aliases["public"] == "/inspire/ssd/project/topic-a/public/"
+        assert aliases["global-me"] == "/inspire/ssd/global_user/alice/"
+        assert aliases["hdd.me"] == "/inspire/hdd/project/topic-a/alice/"
+        assert aliases["ssd.public"] == "/inspire/ssd/project/topic-a/public/"
+        assert aliases["qb-ilm2.me"] == "/inspire/qb-ilm2/project/topic-a/alice/"
 
     def _setup_discover_mocks(
         self,

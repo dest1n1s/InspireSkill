@@ -19,7 +19,7 @@ def _patch_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     )
     cfg.workspaces = {
         "分布式训练空间": "ws-11111111-1111-1111-1111-111111111111",
-        "CPU资源空间":   "ws-22222222-2222-2222-2222-222222222222",
+        "CPU资源空间": "ws-22222222-2222-2222-2222-222222222222",
     }
     monkeypatch.setattr(
         config_module.Config,
@@ -59,9 +59,7 @@ def _stub_browser(
         "list_notebook_compute_groups",
         lambda **kwargs: groups_by_ws.get(kwargs["workspace_id"], []),
     )
-    monkeypatch.setattr(
-        specs_module.browser_api_module, "get_resource_prices", prices_fn
-    )
+    monkeypatch.setattr(specs_module.browser_api_module, "get_resource_prices", prices_fn)
 
 
 def _make_price(*, qid: str, gpu: int, cpu: int, mem: int, gpu_type: str = "") -> dict:
@@ -119,9 +117,7 @@ def test_explicit_workspace_skips_cross_search(
     monkeypatch.setattr(
         specs_module.browser_api_module, "list_notebook_compute_groups", list_groups
     )
-    monkeypatch.setattr(
-        specs_module.browser_api_module, "get_resource_prices", lambda **_: []
-    )
+    monkeypatch.setattr(specs_module.browser_api_module, "get_resource_prices", lambda **_: [])
 
     result = CliRunner().invoke(
         cli_main, ["--json", "resources", "specs", "--workspace", "CPU资源空间"]
@@ -159,7 +155,10 @@ def test_default_usage_all_queries_all_three_schedule_types(
     rows_by_usage = {row["usage"]: row for row in payload["data"]["specs"]}
     assert set(rows_by_usage) == {"notebook", "job", "hpc", "ray"}
     # Each row carries the (gpu, cpu, mem) triple — no spec_id surfaced.
-    assert (rows_by_usage["notebook"]["cpu_count"], rows_by_usage["notebook"]["memory_size_gib"]) == (4, 16)
+    assert (
+        rows_by_usage["notebook"]["cpu_count"],
+        rows_by_usage["notebook"]["memory_size_gib"],
+    ) == (4, 16)
     assert (rows_by_usage["job"]["cpu_count"], rows_by_usage["job"]["memory_size_gib"]) == (16, 64)
     assert (rows_by_usage["hpc"]["cpu_count"], rows_by_usage["hpc"]["memory_size_gib"]) == (8, 32)
     assert (rows_by_usage["ray"]["cpu_count"], rows_by_usage["ray"]["memory_size_gib"]) == (2, 8)
@@ -213,9 +212,7 @@ def test_json_rows_carry_only_names_no_uuids(
     assert "q-1" not in result.output
 
 
-def test_usage_ray_only_queries_ray(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_usage_ray_only_queries_ray(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _patch_config(monkeypatch, tmp_path)
     seen_types: list[str] = []
 
@@ -293,8 +290,144 @@ def test_help_advertises_default_all_and_no_uuid_in_output(
 def test_no_specs_message(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _patch_config(monkeypatch, tmp_path)
     _stub_browser(monkeypatch, groups_by_ws={}, prices_fn=lambda **_: [])
-    result = CliRunner().invoke(
-        cli_main, ["resources", "specs", "--workspace", "CPU资源空间"]
-    )
+    result = CliRunner().invoke(cli_main, ["resources", "specs", "--workspace", "CPU资源空间"])
     assert result.exit_code == 0
     assert "No resource specs found." in result.output
+
+
+def test_specs_human_table_uses_display_width_for_chinese(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from inspire.cli.commands.resources.table import display_width
+
+    _patch_config(monkeypatch, tmp_path)
+    _stub_browser(
+        monkeypatch,
+        groups_by_ws={
+            _WS_CPU: [{"logic_compute_group_id": "lcg-cpu-1", "name": "CPU资源-很长的中文分区"}]
+        },
+        prices_fn=lambda **_: [_make_price(qid="q-1", gpu=0, cpu=4, mem=16)],
+    )
+
+    result = CliRunner().invoke(
+        cli_main, ["resources", "specs", "--workspace", "CPU资源空间", "--usage", "ray"]
+    )
+    assert result.exit_code == 0, result.output
+    lines = result.output.splitlines()
+    separator_indexes = [idx for idx, line in enumerate(lines) if line and set(line) == {"-"}]
+    assert len(separator_indexes) >= 3
+    table_width = len(lines[separator_indexes[0]])
+    for line in lines[separator_indexes[0] : separator_indexes[-1] + 1]:
+        if line and set(line) != {"-"}:
+            assert display_width(line) == table_width
+
+
+def test_resources_list_human_hides_raw_group_ids(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from inspire.cli.commands.resources import resources_list as list_module
+    from inspire.platform.web.browser_api.availability.models import GPUAvailability
+
+    _patch_config(monkeypatch, tmp_path)
+    monkeypatch.setattr(list_module, "get_web_session", lambda: _Session())
+    monkeypatch.setattr(
+        list_module.browser_api_module,
+        "get_accurate_resource_availability",
+        lambda **_: [
+            GPUAvailability(
+                group_id="lcg-secret-raw-id",
+                group_name="中文资源组",
+                gpu_type="H200",
+                total_gpus=16,
+                used_gpus=4,
+                available_gpus=12,
+                low_priority_gpus=0,
+                workspace_id=_WS_CPU,
+                workspace_name="CPU资源空间",
+            )
+        ],
+    )
+
+    result = CliRunner().invoke(cli_main, ["resources", "list", "--all"])
+    assert result.exit_code == 0, result.output
+    assert "中文资源组" in result.output
+    assert "lcg-secret-raw-id" not in result.output
+
+
+def test_availability_prefers_cluster_basic_info_and_node_dimension(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from inspire.platform.web.browser_api.availability import api as availability_api
+
+    calls: list[str] = []
+
+    class _AvailabilitySession:
+        workspace_id = _WS_CPU
+        all_workspace_ids = [_WS_CPU]
+        all_workspace_names = {_WS_CPU: "CPU资源空间"}
+
+    def fake_request(session, method, path, *, referer, body=None, timeout=30):
+        calls.append(path)
+        if path.endswith("/compute_resources/cluster_basic_info"):
+            return {
+                "code": 0,
+                "data": {
+                    "logic_compute_groups": [
+                        {
+                            "logic_compute_group_id": "lcg-live",
+                            "name": "实时资源组",
+                        }
+                    ]
+                },
+            }
+        if path.endswith("/compute_resources/logic_compute_groups/lcg-live"):
+            return {
+                "code": 0,
+                "data": {
+                    "logic_resouces": {
+                        "gpu_total": 16,
+                        "gpu_used": 4,
+                        "gpu_low_priority_used": 1,
+                        "cpu_total": 80,
+                        "cpu_used": 20,
+                        "memory_gi_total": 800,
+                        "memory_gi_used": 200,
+                    },
+                    "gpu_type_stats": [{"gpu_info": {"gpu_type_display": "H200"}}],
+                },
+            }
+        if path.endswith("/compute_resources/list_node_dimension"):
+            return {
+                "code": 0,
+                "data": {
+                    "node_dimensions": [
+                        {
+                            "gpu_count": 8,
+                            "status": "READY",
+                            "task_list": [],
+                            "resource_pool": "online",
+                        },
+                        {
+                            "gpu_count": 8,
+                            "status": "READY",
+                            "task_list": [{"name": "busy"}],
+                            "resource_pool": "online",
+                        },
+                    ]
+                },
+            }
+        raise AssertionError(f"unexpected path: {path}")
+
+    monkeypatch.setattr(availability_api, "_request_json", fake_request)
+    rows = availability_api.get_accurate_resource_availability(
+        workspace_id=_WS_CPU,
+        session=_AvailabilitySession(),
+        include_cpu=False,
+    )
+
+    assert [row.group_name for row in rows] == ["实时资源组"]
+    assert rows[0].available_gpus == 12
+    assert rows[0].ready_nodes == 2
+    assert rows[0].free_nodes == 1
+    assert any(path.endswith("/compute_resources/cluster_basic_info") for path in calls)
+    assert not any(path.endswith("/logic_compute_groups/list") for path in calls)

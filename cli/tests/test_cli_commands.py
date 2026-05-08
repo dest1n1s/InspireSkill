@@ -12,9 +12,7 @@ from inspire.cli.context import (
     EXIT_API_ERROR,
     EXIT_CONFIG_ERROR,
     EXIT_AUTH_ERROR,
-    EXIT_GENERAL_ERROR,
     EXIT_TIMEOUT,
-    EXIT_LOG_NOT_FOUND,
     EXIT_JOB_NOT_FOUND,
 )
 
@@ -24,7 +22,6 @@ from inspire.cli.commands.notebook import notebook_commands as notebook_cmd_modu
 from inspire.cli.utils import auth as auth_module
 from inspire.platform.web import browser_api as browser_api_module
 from inspire.platform.web import session as web_session_module
-from inspire.cli.utils.auth import AuthenticationError
 from inspire.config import ConfigError
 from inspire.cli.utils.quota_resolver import ResolvedQuota
 
@@ -316,6 +313,19 @@ def test_job_help_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     assert "Manage training jobs" in result.output
 
 
+def test_job_list_help_uses_workspace_name_not_raw_id_hint(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    patch_config_and_auth(monkeypatch, tmp_path)
+    runner = CliRunner()
+
+    result = runner.invoke(cli_main, ["job", "list", "--help"])
+
+    assert result.exit_code == 0
+    assert "Workspace alias or name" in result.output
+    assert "ws-... id" not in result.output
+
+
 # ---------------------------------------------------------------------------
 # Job command group
 # ---------------------------------------------------------------------------
@@ -420,6 +430,26 @@ def test_job_status_human_output_hides_raw_id(monkeypatch: pytest.MonkeyPatch, t
     assert "Job Status" in result.output
     assert "Name: test-job" in result.output
     assert TEST_JOB_ID not in result.output  # raw id stays out of human output
+
+
+def test_legacy_human_job_list_formatter_is_name_only() -> None:
+    from inspire.cli.formatters.human_formatter import format_job_list
+
+    output = format_job_list(
+        [
+            {
+                "job_id": TEST_JOB_ID,
+                "name": "visible-name",
+                "status": "RUNNING",
+                "created_at": "2026-05-06T14:48:50",
+            }
+        ]
+    )
+
+    assert "visible-name" in output
+    assert "Job ID" not in output
+    assert TEST_JOB_ID not in output
+    assert format_job_list([]) == "No jobs found."
 
 
 def test_job_status_not_found_sets_specific_exit_code(
@@ -618,6 +648,7 @@ def test_job_list_web_name_search_scans_all_workspaces(
     payload = json.loads(result.output)
     assert payload["success"] is True
     assert payload["data"]["source"] == "web"
+    assert payload["data"]["jobs"][0]["job_id"] == TEST_JOB_ID
     assert payload["data"]["jobs"][0]["name"] == "kchen-slime-code-qwen35-35b-a3b-6node"
     assert payload["data"]["jobs"][0]["workspace_name"] == "Training Workspace"
     assert calls[0]["created_by"] == "user-me"
@@ -625,6 +656,86 @@ def test_job_list_web_name_search_scans_all_workspaces(
     # test fixture's "cpu" alias is also scanned as part of that union.
     scanned = {call["workspace_id"] for call in calls}
     assert {"ws-main", "ws-train"} <= scanned
+
+
+def test_job_list_human_output_hides_raw_ids_and_name_search_ignores_job_id(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    patch_config_and_auth(monkeypatch, tmp_path)
+
+    from importlib import import_module
+
+    job_commands_module = import_module("inspire.cli.commands.job.job_commands")
+    jobs_module = import_module("inspire.platform.web.browser_api.jobs")
+    JobInfo = jobs_module.JobInfo
+
+    class FakeSession:
+        workspace_id = "ws-main"
+        all_workspace_ids = ["ws-main", "ws-train"]
+        all_workspace_names = {
+            "ws-main": "Main Workspace",
+            "ws-train": "Training Workspace",
+        }
+        storage_state = {"cookies": [{"name": "session", "value": "ok"}]}
+
+    monkeypatch.setattr(job_commands_module, "get_web_session", lambda: FakeSession())
+    monkeypatch.setattr(
+        browser_api_module,
+        "get_current_user",
+        lambda session=None: {"id": "user-me"},  # noqa: ARG005
+    )
+
+    def fake_list_jobs(
+        workspace_id=None,
+        created_by=None,
+        status=None,
+        page_num=1,
+        page_size=100,
+        session=None,
+    ):  # noqa: ARG001
+        if workspace_id == "ws-train" and page_num == 1:
+            return (
+                [
+                    JobInfo(
+                        job_id=TEST_JOB_ID,
+                        name="kchen-slime-code-qwen35-35b-a3b-6node",
+                        status="job_queuing",
+                        command="bash run_qwen35_35b_a3b_code_6node.sh",
+                        created_at="2026-05-06T14:48:50",
+                        finished_at=None,
+                        created_by_name="Chen Ke",
+                        created_by_id="user-me",
+                        project_id="project-1",
+                        project_name="CQ Project",
+                        compute_group_name="H200-3",
+                        gpu_type="NVIDIA H200",
+                        gpu_count=8,
+                        instance_count=6,
+                        priority=10,
+                        workspace_id="ws-train",
+                    )
+                ],
+                1,
+            )
+        return ([], 0)
+
+    monkeypatch.setattr(browser_api_module, "list_jobs", fake_list_jobs)
+
+    runner = CliRunner()
+    human_result = runner.invoke(cli_main, ["job", "list", "-A", "--name", "qwen35"])
+
+    assert human_result.exit_code == 0
+    assert "kchen-slime-code-qwen35-35b-a3b-6node" in human_result.output
+    assert "Training Workspace" in human_result.output
+    assert TEST_JOB_ID not in human_result.output
+    assert "ws-train" not in human_result.output
+    assert "project-1" not in human_result.output
+
+    id_query_result = runner.invoke(cli_main, ["job", "list", "-A", "--name", "12345678"])
+
+    assert id_query_result.exit_code == 0
+    assert "No jobs found." in id_query_result.output
+    assert TEST_JOB_ID not in id_query_result.output
 
 
 def test_nodes_list_json(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):

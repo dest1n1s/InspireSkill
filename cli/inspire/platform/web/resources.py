@@ -72,6 +72,7 @@ def fetch_resource_availability(
     config: Optional[Config] = None,
     known_only: bool = False,
     progress_callback: Optional[Callable[[int, int], None]] = None,
+    use_cache: bool = False,
 ) -> list[ComputeGroupAvailability]:
     """Fetch real-time GPU availability from compute groups.
 
@@ -82,6 +83,7 @@ def fetch_resource_availability(
         config: Optional CLI configuration (used for base_url override and compute_groups)
         known_only: If True, only return known compute groups (for auto-selection)
         progress_callback: Optional callback(fetched, total) for progress updates
+        use_cache: If True, reuse the short-lived in-process metadata cache
 
     Returns:
         List of ComputeGroupAvailability sorted by free_gpus (descending)
@@ -107,8 +109,8 @@ def fetch_resource_availability(
     # Update global for backward compatibility
     KNOWN_COMPUTE_GROUPS = known_groups_map
 
-    # Check cache
-    if _availability_cache and (time.time() - _cache_time < _CACHE_TTL):
+    # Cache is only an optional display accelerator; live API results remain authoritative.
+    if use_cache and _availability_cache and (time.time() - _cache_time < _CACHE_TTL):
         cache_key = "known" if known_only else "all"
         if cache_key in _availability_cache:
             return _availability_cache[cache_key]
@@ -214,11 +216,11 @@ def fetch_resource_availability(
     # Sort by free_gpus descending
     availability_list.sort(key=lambda x: x.free_gpus, reverse=True)
 
-    # Update cache
-    if _availability_cache is None:
-        _availability_cache = {}
-    _availability_cache["known" if known_only else "all"] = availability_list
-    _cache_time = time.time()
+    if use_cache:
+        if _availability_cache is None:
+            _availability_cache = {}
+        _availability_cache["known" if known_only else "all"] = availability_list
+        _cache_time = time.time()
 
     return availability_list
 

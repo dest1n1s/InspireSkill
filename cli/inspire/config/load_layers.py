@@ -19,6 +19,7 @@ from inspire.config.toml import (
 )
 
 from .load_common import _ProjectLayerState, _parse_alias_map
+from .path_aliases import normalize_path_alias_map
 
 
 def _apply_project_layer(
@@ -53,6 +54,7 @@ def _apply_project_layer(
 
     project_compute_groups = project_raw.pop("compute_groups", [])
     project_remote_env = {str(k): str(v) for k, v in project_raw.pop("remote_env", {}).items()}
+    project_path_aliases = normalize_path_alias_map(project_raw.pop("path_aliases", {}))
     project_projects = _parse_alias_map(project_raw.pop("projects", {}))
     layer_state.project_projects = project_projects
 
@@ -92,7 +94,7 @@ def _apply_project_layer(
             "to refresh project state, or `inspire account add` to (re)set "
             "account-scope values). The project file should only contain "
             "[paths] / [context] / [defaults] / [workspaces] / [projects] / "
-            "[compute_groups] / [remote_env] / [cli]."
+            "[compute_groups] / [remote_env] / [path_aliases] / [cli]."
         )
 
     for toml_key, value in flat_project.items():
@@ -109,6 +111,9 @@ def _apply_project_layer(
         merged_remote_env.update(project_remote_env)
         config_dict["remote_env"] = merged_remote_env
         sources["remote_env"] = SOURCE_PROJECT
+    if project_path_aliases:
+        config_dict["path_aliases"] = project_path_aliases
+        sources["path_aliases"] = SOURCE_PROJECT
 
     # Merge project alias maps on top of account-level ones (project wins).
     if project_projects:

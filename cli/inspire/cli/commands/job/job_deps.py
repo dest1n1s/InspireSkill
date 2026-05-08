@@ -3,10 +3,9 @@
 Tests can patch ``time.time`` here and the patch will be observed across
 all job command modules.
 
-The previous ``JobCache`` / ``fetch_remote_log_via_bridge`` attributes
-were removed when the local job cache and the deprecated
-GitHub-workflow log fetcher were dropped — both flows are now
-SSH-tunnel-only.
+The previous local-cache and GitHub-workflow log fetcher hooks were
+dropped. Job commands now use live platform APIs for job state and the
+SSH tunnel path for logs.
 """
 
 from __future__ import annotations

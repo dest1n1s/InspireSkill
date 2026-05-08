@@ -10,10 +10,12 @@ import click
 
 from inspire.cli.context import (
     Context,
+    EXIT_CONFIG_ERROR,
     EXIT_GENERAL_ERROR,
     EXIT_TIMEOUT,
     pass_context,
 )
+from inspire.config import Config, ConfigError, resolve_remote_path_alias
 from inspire.bridge.tunnel import (
     TunnelNotAvailableError,
     BridgeNotFoundError,
@@ -74,7 +76,7 @@ def bridge_scp(
     By default, uploads SOURCE (local) to DESTINATION (remote).
     Use --download to download SOURCE (remote) to DESTINATION (local).
     Remote paths are literal and do not inherit INSPIRE_TARGET_DIR; relative
-    remote paths trigger a warning.
+    remote paths trigger a warning. Use alias:sub/path to expand [path_aliases].
 
     \b
     Examples:
@@ -93,6 +95,11 @@ def bridge_scp(
         list_command="inspire notebook connections",
     )
     bridge = notebook
+    try:
+        config, _ = Config.from_files_and_env(require_target_dir=False, require_credentials=False)
+    except ConfigError as e:
+        _handle_error(ctx, "ConfigError", str(e), EXIT_CONFIG_ERROR)
+
     # Validate local path exists for uploads
     if not download:
         local = Path(source)
@@ -123,6 +130,15 @@ def bridge_scp(
     else:
         local_path, remote_path = source, destination
 
+    try:
+        remote_path, used_alias = resolve_remote_path_alias(
+            remote_path,
+            config.path_aliases,
+            require_absolute_or_alias=False,
+        )
+    except ConfigError as e:
+        _handle_error(ctx, "ConfigError", str(e), EXIT_CONFIG_ERROR)
+
     _warn_if_remote_path_is_relative(remote_path, download=download)
 
     direction = "download" if download else "upload"
@@ -131,6 +147,8 @@ def bridge_scp(
         click.echo(f"SCP {direction}: {source} -> {destination}")
         if bridge:
             click.echo(f"Notebook: {bridge}")
+        if used_alias:
+            click.echo(f"Remote path: {remote_path}")
         if recursive:
             click.echo("Mode: recursive")
 

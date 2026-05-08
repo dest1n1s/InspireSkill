@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# InspireSkill installer — no local clone, no symlinks.
+# InspireSkill installer — published package plus managed skill files.
 #
 # Reads: none (self-contained tarball + uv/pipx download)
 # Writes:
@@ -8,7 +8,7 @@
 #   - ~/Library/LaunchAgents/sh.inspire-skill.update-check.plist  (macOS only)
 #   - ~/.inspire/update-status.json  (via post-install `inspire update --check`)
 #
-# Usage (typical, no clone required):
+# Usage:
 #   curl -fsSL https://raw.githubusercontent.com/realZillionX/InspireSkill/main/scripts/install.sh | bash
 #   curl -fsSL .../install.sh | bash -s -- --harness claude,codex
 #   curl -fsSL .../install.sh | bash -s -- --no-schedule
@@ -17,7 +17,6 @@
 #   --harness claude[,codex,gemini]   explicit harness list (default: auto-detect)
 #   --no-cli                          skip installing the Python package (skill-only)
 #   --no-schedule                     skip the macOS launchd update-check agent
-#   --ref <git-ref>                   pin install/refresh to a branch/tag/SHA (default: main)
 #
 set -euo pipefail
 
@@ -29,7 +28,6 @@ LAUNCH_LABEL="sh.inspire-skill.update-check"
 HARNESSES=""
 INSTALL_CLI=1
 INSTALL_SCHEDULE=1
-REF="$DEFAULT_REF"
 
 color()  { local c="$1"; shift; printf '\033[%sm%s\033[0m' "$c" "$*"; }
 bold()   { color "1"  "$@"; }
@@ -43,7 +41,7 @@ ok()     { printf '%s %s\n' "$(green '✓')" "$*"; }
 warn()   { printf '%s %s\n' "$(yellow '!')" "$*"; }
 die()    { printf '%s %s\n' "$(red '✗')" "$*" >&2; exit 1; }
 
-usage() { sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
+usage() { sed -n '2,/^set -euo pipefail$/p' "$0" | sed '$d; s/^# \{0,1\}//'; exit 0; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -51,8 +49,6 @@ while [[ $# -gt 0 ]]; do
     --harness=*)     HARNESSES="${1#*=}";  shift ;;
     --no-cli)        INSTALL_CLI=0;        shift ;;
     --no-schedule)   INSTALL_SCHEDULE=0;   shift ;;
-    --ref)           REF="$2";             shift 2 ;;
-    --ref=*)         REF="${1#*=}";        shift ;;
     -h|--help)       usage ;;
     *)               die "unknown argument: $1" ;;
   esac
@@ -91,17 +87,9 @@ need tar
 need mktemp
 
 # ---- install CLI via uv tool / pipx ----------------------------------------
-# Default: install from PyPI (fast, cacheable, works behind Tsinghua / Aliyun
-# mirrors that a lot of users here rely on). If the caller passed --ref to
-# pin to a branch / tag / SHA, fall back to the git spec — that path exists
-# for bisecting or trying un-released changes.
-if [[ "$REF" == "$DEFAULT_REF" ]]; then
-  SPEC="$PACKAGE"
-  SPEC_LABEL="$(bold "$PACKAGE") (PyPI)"
-else
-  SPEC="git+https://github.com/${REPO_SLUG}.git@${REF}#subdirectory=cli"
-  SPEC_LABEL="$(dim "$SPEC")"
-fi
+# Install from PyPI, so the user path stays on published releases.
+SPEC="$PACKAGE"
+SPEC_LABEL="$(bold "$PACKAGE") (PyPI)"
 
 if (( INSTALL_CLI )); then
   if command -v uv >/dev/null 2>&1; then
@@ -168,13 +156,10 @@ fi
 TMP="$(mktemp -d -t inspire-skill.XXXXXX)"
 trap 'rm -rf "$TMP"' EXIT
 
-# codeload accepts the short form `tar.gz/<ref>` for branches, tags AND
-# commit SHAs. The previous form `tar.gz/refs/heads/<ref>` 404'd for tags
-# (e.g. `--ref v3.0.0`) and SHAs — see release notes for v3.0.3.
-TAR_URL="https://codeload.github.com/${REPO_SLUG}/tar.gz/${REF}"
+TAR_URL="https://codeload.github.com/${REPO_SLUG}/tar.gz/${DEFAULT_REF}"
 log "fetching skill bundle $(dim "$TAR_URL")"
 if ! curl -fsSL "$TAR_URL" | tar -xzf - -C "$TMP"; then
-  die "tarball fetch failed — check network / proxy, and that ref '$REF' exists in the repo (try $(bold 'git ls-remote https://github.com/'"$REPO_SLUG"'.git') to confirm)."
+  die "tarball fetch failed — check network / proxy and retry."
 fi
 
 TOP="$(find "$TMP" -mindepth 1 -maxdepth 1 -type d | head -n1)"
@@ -232,21 +217,6 @@ install_launch_agent() {
   local log_file="$HOME/Library/Logs/inspire-skill-update-check.log"
   mkdir -p "$(dirname "$plist")" "$(dirname "$log_file")"
 
-  # launchd doesn't inherit the user's shell env on macOS, so the daily
-  # version check needs proxy vars baked in IF the user has them set right
-  # now. Read what's in the current env (which `curl | bash` inherits from
-  # the user's shell). If nothing's set, we leave the EnvironmentVariables
-  # block minimal — the previous version of this script hardcoded
-  # 127.0.0.1:7897 (Clash Verge default) which silently broke for everyone
-  # who didn't run that exact proxy.
-  local user_http="${http_proxy:-${HTTP_PROXY:-}}"
-  local user_https="${https_proxy:-${HTTPS_PROXY:-${user_http:-}}}"
-  local proxy_block=""
-  if [[ -n "$user_http" || -n "$user_https" ]]; then
-    proxy_block=$(printf '    <key>http_proxy</key>                <string>%s</string>\n    <key>https_proxy</key>               <string>%s</string>\n    <key>HTTP_PROXY</key>                <string>%s</string>\n    <key>HTTPS_PROXY</key>               <string>%s</string>\n' \
-      "$user_http" "$user_https" "$user_http" "$user_https")
-  fi
-
   cat >"$plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -263,7 +233,7 @@ install_launch_agent() {
   <key>EnvironmentVariables</key>
   <dict>
     <key>INSPIRE_SKIP_UPDATE_CHECK</key> <string>1</string>
-${proxy_block}  </dict>
+  </dict>
   <key>StartInterval</key>         <integer>86400</integer>
   <key>RunAtLoad</key>             <true/>
   <key>StandardOutPath</key>       <string>${log_file}</string>

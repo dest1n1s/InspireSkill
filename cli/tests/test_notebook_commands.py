@@ -8,6 +8,8 @@ from click.testing import CliRunner
 from inspire import config as config_module
 from inspire.bridge import tunnel as tunnel_module
 from inspire.cli.commands.notebook import notebook_commands as notebook_cmd_module
+from inspire.cli.commands.notebook import remote_exec as remote_exec_module
+from inspire.cli.commands.notebook import remote_shell as remote_shell_module
 from inspire.cli.commands.notebook import notebook_ssh_flow as ssh_flow_module
 from inspire.cli.context import (
     Context,
@@ -1644,3 +1646,113 @@ def test_ssh_notebook_cache_hit_invokes_reconnect_with_notebook_kwarg(
 
     assert result.exit_code == EXIT_SUCCESS
     assert captured["notebook"] == "gpu-main"
+
+
+def test_notebook_set_path_writes_project_path_alias(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli_main,
+        [
+            "notebook",
+            "set-path",
+            "main-notebook",
+            "/inspire/ssd/project/topic/alice/",
+            "as",
+            "me",
+        ],
+    )
+
+    assert result.exit_code == EXIT_SUCCESS
+    config_path = tmp_path / ".inspire" / "config.toml"
+    assert config_path.exists()
+    content = config_path.read_text(encoding="utf-8")
+    assert "[path_aliases]" in content
+    assert 'me = "/inspire/ssd/project/topic/alice/"' in content
+
+
+def test_notebook_exec_cwd_uses_path_alias(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    config = config_module.Config(
+        username="",
+        password="",
+        target_dir="/inspire/hdd/project/topic/alice/default",
+        path_aliases={"me": "/inspire/ssd/project/topic/alice/"},
+    )
+    tunnel_config = tunnel_module.TunnelConfig()
+    tunnel_config.add_bridge(
+        tunnel_module.BridgeProfile(name="gpu-main", proxy_url="https://proxy.example.com")
+    )
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        config_module.Config,
+        "from_files_and_env",
+        classmethod(lambda cls, require_target_dir=False, require_credentials=True: (config, {})),
+    )
+    monkeypatch.setattr(remote_exec_module, "load_tunnel_config", lambda: tunnel_config)
+    monkeypatch.setattr(remote_exec_module, "is_tunnel_available", lambda *args, **kwargs: True)
+
+    def fake_stream(**kwargs: object) -> int:
+        captured.update(kwargs)
+        return 0
+
+    monkeypatch.setattr(remote_exec_module, "run_ssh_command_streaming", fake_stream)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli_main,
+        ["notebook", "exec", "gpu-main", "--cwd", "me:repo", "pwd"],
+    )
+
+    assert result.exit_code == EXIT_SUCCESS
+    assert 'cd "/inspire/ssd/project/topic/alice/repo" && pwd' in str(captured["command"])
+
+
+def test_notebook_shell_cwd_uses_path_alias(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    config = config_module.Config(
+        username="",
+        password="",
+        target_dir="/inspire/hdd/project/topic/alice/default",
+        path_aliases={"me": "/inspire/ssd/project/topic/alice/"},
+    )
+    tunnel_config = tunnel_module.TunnelConfig()
+    tunnel_config.add_bridge(
+        tunnel_module.BridgeProfile(name="gpu-main", proxy_url="https://proxy.example.com")
+    )
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        config_module.Config,
+        "from_files_and_env",
+        classmethod(lambda cls, require_target_dir=False, require_credentials=True: (config, {})),
+    )
+    monkeypatch.setattr(remote_shell_module, "load_tunnel_config", lambda: tunnel_config)
+    monkeypatch.setattr(remote_shell_module, "is_tunnel_available", lambda *args, **kwargs: True)
+
+    def fake_get_ssh_command_args(bridge_name, config, remote_command=None):  # type: ignore[no-untyped-def]
+        captured["bridge_name"] = bridge_name
+        captured["remote_command"] = remote_command
+        return ["ssh", "root@localhost"]
+
+    monkeypatch.setattr(remote_shell_module, "get_ssh_command_args", fake_get_ssh_command_args)
+    monkeypatch.setattr(remote_shell_module.subprocess, "call", lambda args: 0)
+
+    runner = CliRunner()
+    result = runner.invoke(cli_main, ["notebook", "shell", "gpu-main", "--cwd", "me:repo"])
+
+    assert result.exit_code == EXIT_SUCCESS
+    assert captured["bridge_name"] == "gpu-main"
+    assert (
+        'cd "/inspire/ssd/project/topic/alice/repo" && exec $SHELL -l'
+        in str(captured["remote_command"])
+    )

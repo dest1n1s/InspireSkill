@@ -10,6 +10,7 @@ from inspire.bridge.tunnel import BridgeProfile, TunnelConfig
 from inspire.bridge.tunnel.scp import _build_scp_base_args
 from inspire.cli.main import main as cli_main
 from inspire.cli.context import EXIT_GENERAL_ERROR, EXIT_SUCCESS, EXIT_TIMEOUT
+from inspire.config import Config
 
 import importlib
 
@@ -116,6 +117,45 @@ def test_bridge_scp_warns_when_remote_path_is_relative(
     assert result.exit_code == EXIT_SUCCESS
     assert "does not use INSPIRE_TARGET_DIR" in result.output
     assert "Warning: remote destination 'artifacts/test.txt'" in result.output
+
+
+def test_bridge_scp_resolves_remote_path_alias(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    local_file = tmp_path / "test.txt"
+    local_file.write_text("hello")
+
+    config = Config(username="", password="", path_aliases={"me": "/inspire/ssd/project/p1/alice/"})
+    tunnel_config = TunnelConfig()
+    tunnel_config.add_bridge(BridgeProfile(name="default", proxy_url="https://proxy.example.com"))
+    captured: Dict[str, Any] = {}
+
+    monkeypatch.setattr(
+        Config,
+        "from_files_and_env",
+        classmethod(lambda cls, require_target_dir=False, require_credentials=True: (config, {})),
+    )
+    monkeypatch.setattr(scp_cmd_module, "load_tunnel_config", lambda: tunnel_config)
+    monkeypatch.setattr(scp_cmd_module, "is_tunnel_available", lambda **kw: True)
+
+    class FakeResult:
+        returncode = 0
+
+    def fake_scp(**kwargs: Any) -> FakeResult:
+        captured.update(kwargs)
+        return FakeResult()
+
+    monkeypatch.setattr(scp_cmd_module, "run_scp_transfer", fake_scp)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli_main,
+        ["notebook", "scp", "default", str(local_file), "me:artifacts/test.txt"],
+    )
+
+    assert result.exit_code == EXIT_SUCCESS
+    assert "does not use INSPIRE_TARGET_DIR" not in result.output
+    assert captured["remote_path"] == "/inspire/ssd/project/p1/alice/artifacts/test.txt"
 
 
 def test_bridge_scp_warns_when_remote_source_is_relative_on_download(

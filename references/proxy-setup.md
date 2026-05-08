@@ -103,9 +103,9 @@ curl -sS -o /dev/null -w "sii:    %{http_code}\n" \
 
 ## 与 InspireSkill 的衔接
 
-**CLI 不绑定 `7897`**。它只是一个通用的代理消费者，从 `config.toml`（`[proxy]` 下的 `requests_http / requests_https / playwright / rtunnel`）或对应环境变量（`INSPIRE_REQUESTS_HTTP_PROXY` 等）读取代理地址，你给什么地址就走什么地址。本文档把 `7897` 作为示例，是因为 Clash Verge 默认就监听这个端口；如果你用其他代理（原生 SOCKS5 / HTTP 代理、其他端口的 Clash 配置、公司 VPN 等），把对应的 `127.0.0.1:<port>` 填进上面这些字段即可，InspireSkill 不关心端口号。
+**CLI 不绑定 `7897`**。它只是一个通用的代理消费者，从账号配置的 `[proxy]` 读取代理地址，你给什么地址就走什么地址。本文档把 `7897` 作为示例，是因为 Clash Verge 常见配置会监听这个端口；如果你用其他代理（原生 SOCKS5 / HTTP 代理、其他端口的 Clash 配置、公司 VPN 等），在 `inspire account add <name>` 中填入对应的 `127.0.0.1:<port>` 即可，InspireSkill 不关心端口号。
 
-按上面的模板配好 Clash Verge 之后，把 `127.0.0.1:7897` 写到 `config.toml` 的 `[proxy]` 或导出对应环境变量，CLI 就会自动把公网和 `*.sii.edu.cn` 流量都路由过去。若有异常，可用：
+按上面的模板配好 Clash Verge 之后，通过账号配置保存代理，CLI 就会自动把公网和 `*.sii.edu.cn` 流量都路由过去。若有异常，可用：
 
 ```bash
 inspire config show --compact   # 确认 proxy 字段和来源

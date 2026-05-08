@@ -4,13 +4,13 @@ from inspire.cli.formatters.human_formatter import format_job_status
 from inspire.cli.main import main as cli_main
 
 
-def test_root_help_explains_global_json_position() -> None:
+def test_root_help_keeps_json_as_script_interface() -> None:
     runner = CliRunner()
     result = runner.invoke(cli_main, ["--help"])
 
     assert result.exit_code == 0
-    assert "before the subcommand" in result.output
-    assert "inspire --json hpc status <name>" in result.output
+    assert "Default human output is the Agent-facing observation surface." in result.output
+    assert "Use JSON only for scripts or structured automation." in result.output
 
 
 def test_job_status_formatter_shows_platform_priority_fields() -> None:

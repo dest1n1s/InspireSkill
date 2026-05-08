@@ -287,15 +287,14 @@ def build_resource_spec_price(
 ) -> dict[str, Any]:
     """Build the ``resource_spec_price`` dict the notebook create endpoint expects."""
     del shared_memory_size  # kept for symmetry; backend reads shared_memory_size elsewhere
-    cpu_info = (
-        quota.raw_price.get("cpu_info")
-        if isinstance(quota.raw_price.get("cpu_info"), dict)
-        else {}
-    )
+    raw_price = quota.raw_price or {}
+    cpu_info = raw_price.get("cpu_info") if isinstance(raw_price.get("cpu_info"), dict) else {}
+    gpu_info = raw_price.get("gpu_info") if isinstance(raw_price.get("gpu_info"), dict) else {}
+    gpu_type = gpu_info.get("gpu_type") or gpu_info.get("gpu_type_display") or quota.gpu_type
     return {
         "cpu_type": cpu_info.get("cpu_type", ""),
         "cpu_count": quota.cpu_count,
-        "gpu_type": quota.gpu_type,
+        "gpu_type": gpu_type,
         "gpu_count": quota.gpu_count,
         "memory_size_gib": quota.memory_gib,
         "logic_compute_group_id": quota.logic_compute_group_id,

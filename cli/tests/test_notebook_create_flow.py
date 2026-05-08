@@ -26,7 +26,35 @@ def _make_resolved_quota(
         cpu_count=cpu_count,
         memory_gib=memory_gib,
         gpu_type=gpu_type if gpu_count else "",
-        raw_price={"cpu_info": {"cpu_type": "Test CPU"}},
+        raw_price={
+            "cpu_info": {"cpu_type": "Test CPU"},
+            "cpu_price_id": "rpc-cpu",
+            "cpu_price_version_id": 1,
+            "gpu_info": (
+                {
+                    "gpu_type": "NVIDIA_H200_SXM_141G",
+                    "gpu_type_display": "NVIDIA H200 (141GB)",
+                }
+                if gpu_count
+                else {}
+            ),
+            "gpu_price_id": "rpc-gpu" if gpu_count else "",
+            "gpu_price_version_id": 1 if gpu_count else 0,
+            "memory_price_id": "rpc-memory",
+            "memory_price_version_id": 1,
+            "total_price_per_hour": 1 if gpu_count else 0,
+        },
+    )
+
+
+def _make_diagnostics() -> flow_module.NotebookCreateDiagnostics:
+    return flow_module.NotebookCreateDiagnostics(
+        name="fresh-notebook",
+        workspace="gpu",
+        project="Project One",
+        image="Image One",
+        resource="1xH200 + 20CPU + 200GiB",
+        compute_group="H200 Group",
     )
 
 
@@ -310,3 +338,162 @@ def test_run_notebook_create_honors_cpu_only_quota(monkeypatch: pytest.MonkeyPat
     assert calls["quota"].gpu_count == 0
     # Post-start spec requires GPU by default — CPU-only notebook should skip it.
     assert calls.get("post_start_gpu_count", None) in (None, 0)
+
+
+def test_create_notebook_and_report_accepts_id_response_without_human_raw_id(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    ctx = Context()
+    quota = _make_resolved_quota()
+    selected_project = SimpleNamespace(project_id="project-1111", name="Project One")
+    selected_image = SimpleNamespace(
+        image_id="img-1111",
+        url="docker://image",
+        name="Image One",
+    )
+    captured: dict[str, object] = {}
+
+    def fake_create_notebook(**kwargs):  # noqa: ANN001
+        captured.update(kwargs)
+        return {"id": "nb-secret-1111"}
+
+    monkeypatch.setattr(flow_module.browser_api_module, "create_notebook", fake_create_notebook)
+    monkeypatch.setattr(
+        flow_module,
+        "_resolve_created_notebook_id",
+        lambda **_kwargs: pytest.fail("lookup should not run when id is present"),
+    )
+
+    notebook_id = flow_module.create_notebook_and_report(
+        ctx,
+        name="fresh-notebook",
+        resource_display="1xH200 + 20CPU + 200GiB",
+        diagnostics=_make_diagnostics(),
+        selected_project=selected_project,
+        selected_image=selected_image,
+        quota=quota,
+        shm_size=64,
+        auto_stop=True,
+        workspace_id="ws-1111",
+        session=SimpleNamespace(all_workspace_names={"ws-1111": "gpu"}),
+        json_output=False,
+        task_priority=5,
+    )
+
+    out = capsys.readouterr().out
+    assert notebook_id == "nb-secret-1111"
+    assert captured["project_id"] == "project-1111"
+    assert captured["image_id"] == "img-1111"
+    assert captured["logic_compute_group_id"] == "lcg-test"
+    assert captured["quota_id"] == "quota-h200"
+    assert captured["shared_memory_size"] == 64
+    assert captured["task_priority"] == 5
+    assert captured["resource_spec_price"] == {
+        "cpu_type": "Test CPU",
+        "cpu_count": 20,
+        "gpu_type": "NVIDIA_H200_SXM_141G",
+        "gpu_count": 1,
+        "memory_size_gib": 200,
+        "logic_compute_group_id": "lcg-test",
+        "quota_id": "quota-h200",
+    }
+    assert "Notebook created successfully!" in out
+    assert "Name: fresh-notebook" in out
+    assert "Workspace: gpu" in out
+    assert "Compute group: H200 Group" in out
+    assert "inspire notebook events fresh-notebook" in out
+    assert "inspire notebook ssh fresh-notebook" in out
+    assert 'inspire notebook exec fresh-notebook "pwd"' in out
+    assert "inspire notebook delete fresh-notebook --yes" in out
+    assert "nb-secret-1111" not in out
+    assert "ID:" not in out
+
+
+def test_create_notebook_and_report_missing_id_reports_create_context(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    ctx = Context()
+    quota = _make_resolved_quota()
+    selected_project = SimpleNamespace(project_id="project-1111", name="Project One")
+    selected_image = SimpleNamespace(
+        image_id="img-1111",
+        url="docker://image",
+        name="Image One",
+    )
+
+    monkeypatch.setattr(flow_module.browser_api_module, "create_notebook", lambda **_kwargs: {})
+    monkeypatch.setattr(flow_module, "_resolve_created_notebook_id", lambda **_kwargs: "")
+
+    with pytest.raises(SystemExit):
+        flow_module.create_notebook_and_report(
+            ctx,
+            name="fresh-notebook",
+            resource_display="1xH200 + 20CPU + 200GiB",
+            diagnostics=_make_diagnostics(),
+            selected_project=selected_project,
+            selected_image=selected_image,
+            quota=quota,
+            shm_size=64,
+            auto_stop=True,
+            workspace_id="ws-1111",
+            session=SimpleNamespace(all_workspace_names={"ws-1111": "gpu"}),
+            json_output=False,
+            task_priority=5,
+        )
+
+    err = capsys.readouterr().err
+    assert "Notebook 'fresh-notebook' was submitted" in err
+    assert "Notebook: fresh-notebook" in err
+    assert "Workspace: gpu" in err
+    assert "Project: Project One" in err
+    assert "Compute group: H200 Group" in err
+    assert "Platform events: no platform events returned yet." in err
+    assert "nb-" not in err
+
+
+def test_wait_failure_reports_events_and_suppresses_raw_notebook_id(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    ctx = Context()
+
+    def fake_wait(**_kwargs):  # noqa: ANN001
+        raise flow_module.NotebookFailedError(
+            "nb-secret-2222",
+            "FAILED",
+            {
+                "status": "FAILED",
+                "sub_status": "GPU_ALLOC_ERROR",
+                "extra_info": {"NodeName": "node-a"},
+            },
+            events="FailedScheduling: notebook nb-secret-2222 cannot allocate GPU",
+        )
+
+    monkeypatch.setattr(flow_module.browser_api_module, "wait_for_notebook_running", fake_wait)
+
+    with pytest.raises(SystemExit):
+        flow_module.maybe_wait_for_running(
+            ctx,
+            notebook_id="nb-secret-2222",
+            diagnostics=_make_diagnostics(),
+            session=object(),
+            wait=True,
+            needs_post_start=False,
+            json_output=False,
+            timeout=1,
+        )
+
+    err = capsys.readouterr().err
+    assert "Notebook 'fresh-notebook' failed to start." in err
+    assert "Notebook: fresh-notebook" in err
+    assert "Workspace: gpu" in err
+    assert "Project: Project One" in err
+    assert "Compute group: H200 Group" in err
+    assert "terminal status: FAILED" in err
+    assert "sub-status: GPU_ALLOC_ERROR" in err
+    assert "Platform events:" in err
+    assert "FailedScheduling: notebook <notebook-id> cannot allocate GPU" in err
+    assert "NodeName: node-a" in err
+    assert "nb-secret-2222" not in err

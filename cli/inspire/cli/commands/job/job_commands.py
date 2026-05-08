@@ -81,7 +81,7 @@ def _list_workspace_ids(
     """Pick workspace_ids for a job-list call.
 
     Precedence:
-      1. ``--workspace`` explicit alias / ws-id
+      1. ``--workspace`` explicit alias / name
       2. ``-A`` widens to the union of ``[workspaces]`` alias-map values and
          the SSO session's known workspaces (alias map preferred when present
          per the v4 contract; SSO list as a backstop when discover hasn't run)
@@ -123,7 +123,6 @@ def _job_matches_name(job, query: Optional[str]) -> bool:  # noqa: ANN001
     needle = query.lower()
     haystack = " ".join(
         [
-            job.job_id or "",
             job.name or "",
             job.command or "",
             job.project_name or "",
@@ -172,7 +171,7 @@ def _format_job_list(rows: list[dict]) -> str:
     created_w = max(len("Created"), *(len(str(r["created_at"])) for r in rows))
     workspace_w = max(
         len("Workspace"),
-        *(len(str(r.get("workspace_name") or r.get("workspace_id") or "")) for r in rows),
+        *(len(str(r.get("workspace_name") or "")) for r in rows),
     )
     user_w = max(len("Created By"), *(len(str(r.get("created_by_name") or "")) for r in rows))
 
@@ -183,7 +182,7 @@ def _format_job_list(rows: list[dict]) -> str:
     sep = "-" * len(header)
     lines = ["Jobs", header, sep]
     for row in rows:
-        workspace = str(row.get("workspace_name") or row.get("workspace_id") or "")
+        workspace = str(row.get("workspace_name") or "")
         created_by = str(row.get("created_by_name") or "")
         lines.append(
             f"{str(row['name']):<{name_w}}  "
@@ -418,7 +417,7 @@ def _watch_jobs(
     show_default=True,
     help="Refresh interval in seconds for --watch",
 )
-@click.option("--workspace", default=None, help="Workspace alias or ws-... id")
+@click.option("--workspace", default=None, help="Workspace alias or name")
 @click.option(
     "--all-workspaces",
     "-A",
@@ -662,7 +661,7 @@ def delete(ctx: Context, job: str, yes: bool, pick: Optional[int], all_workspace
 
     if not yes and not ctx.json_output:
         click.confirm(
-            f"Permanently delete training job '{job_id}'? This cannot be undone.",
+            f"Permanently delete training job '{job}'? This cannot be undone.",
             abort=True,
         )
 
@@ -730,7 +729,7 @@ def wait(ctx: Context, job: str, timeout: int, interval: int, all_workspaces: bo
         last_status = None
 
         if not ctx.json_output:
-            click.echo(f"Waiting for job {job_id} (timeout: {timeout}s, interval: {interval}s)")
+            click.echo(f"Waiting for job {job} (timeout: {timeout}s, interval: {interval}s)")
 
         while True:
             elapsed = time.time() - start_time
@@ -819,7 +818,7 @@ def show_command(ctx: Context, job: str, all_workspaces: bool) -> None:
             _handle_error(
                 ctx,
                 "CommandNotFound",
-                f"No command found for job {job_id}",
+                f"No command found for job {job}",
                 EXIT_API_ERROR,
             )
             return

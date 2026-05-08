@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import uuid
+import shlex
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -11,7 +13,13 @@ import click
 from inspire.cli.context import Context, EXIT_API_ERROR, EXIT_CONFIG_ERROR
 from inspire.cli.formatters import json_formatter
 from inspire.cli.utils.errors import exit_with_error as _handle_error
-from inspire.cli.utils.notebook_cli import WEB_AUTH_HINT, load_config, require_web_session, resolve_json_output
+from inspire.cli.utils.notebook_cli import (
+    WEB_AUTH_HINT,
+    get_base_url,
+    load_config,
+    require_web_session,
+    resolve_json_output,
+)
 from inspire.cli.utils.notebook_post_start import (
     NotebookPostStartSpec,
     NO_WAIT_POST_START_WARNING,
@@ -32,6 +40,21 @@ from inspire.config.workspaces import select_workspace_id
 from inspire.platform.web import browser_api as browser_api_module
 from inspire.platform.web.browser_api import NotebookFailedError
 from inspire.platform.web.session import WebSession
+from .notebook_lookup import (
+    _list_notebooks_for_workspace,
+    _notebook_id_from_item,
+    _sort_notebook_items,
+)
+
+
+@dataclass(frozen=True)
+class NotebookCreateDiagnostics:
+    name: str
+    workspace: str
+    project: str
+    image: str
+    resource: str
+    compute_group: str
 
 
 def format_quota_display(quota: ResolvedQuota) -> str:
@@ -39,6 +62,145 @@ def format_quota_display(quota: ResolvedQuota) -> str:
         label = quota.gpu_type or "GPU"
         return f"{quota.gpu_count}x{label} + {quota.cpu_count}CPU + {quota.memory_gib}GiB"
     return f"{quota.cpu_count}CPU + {quota.memory_gib}GiB"
+
+
+def _first_non_empty_str(*values: object) -> str:
+    for value in values:
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return ""
+
+
+def _workspace_label(
+    *,
+    workspace_id: str,
+    session: WebSession,
+    config: Config,
+    requested_workspace: str | None,
+) -> str:
+    if requested_workspace:
+        return requested_workspace
+
+    session_names = getattr(session, "all_workspace_names", None) or {}
+    if isinstance(session_names, dict):
+        name = _first_non_empty_str(session_names.get(workspace_id))
+        if name:
+            return name
+
+    workspaces = getattr(config, "workspaces", None) or {}
+    if isinstance(workspaces, dict):
+        for alias, candidate_id in workspaces.items():
+            if str(candidate_id) == workspace_id:
+                return str(alias)
+
+    return workspace_id
+
+
+def _format_create_diagnostics(
+    diagnostics: NotebookCreateDiagnostics,
+    *,
+    reason: str | None = None,
+    events: str | None = None,
+) -> str:
+    lines = [
+        f"Notebook: {diagnostics.name}",
+        f"Workspace: {diagnostics.workspace}",
+        f"Project: {diagnostics.project}",
+        f"Compute group: {diagnostics.compute_group}",
+        f"Image: {diagnostics.image}",
+        f"Resource: {diagnostics.resource}",
+    ]
+    if reason:
+        lines.append(f"Reason: {reason}")
+
+    event_text = (events or "").strip()
+    if event_text:
+        lines.append("Platform events:")
+        lines.extend(f"  {line}" for line in event_text.splitlines() if line.strip())
+    else:
+        lines.append("Platform events: no platform events returned yet.")
+    return "\n".join(lines)
+
+
+def _sanitize_notebook_id(text: str, notebook_id: str) -> str:
+    if not notebook_id:
+        return text
+    return text.replace(notebook_id, "<notebook-id>")
+
+
+def _event_message(event: dict) -> str:
+    reason = _first_non_empty_str(event.get("reason"))
+    message = _first_non_empty_str(event.get("message"), event.get("content"))
+    event_type = _first_non_empty_str(event.get("type"))
+    prefix = f"[{event_type}] " if event_type else ""
+    label = f"{reason}: " if reason else ""
+    return f"{prefix}{label}{message}".strip()
+
+
+def _fetch_event_preview(notebook_id: str, session: WebSession) -> str:
+    try:
+        events = browser_api_module.list_notebook_events(
+            notebook_id,
+            session=session,
+        )
+    except Exception as exc:  # noqa: BLE001 - diagnostics must not hide the root error
+        return f"failed to fetch platform events: {exc}"
+
+    lines = []
+    for event in events[-10:]:
+        if not isinstance(event, dict):
+            continue
+        message = _event_message(event)
+        if message:
+            lines.append(message)
+    return "\n".join(lines)
+
+
+def _extract_notebook_id(result: object) -> str:
+    if not isinstance(result, dict):
+        return ""
+
+    for key in ("notebook_id", "id", "uuid"):
+        value = _first_non_empty_str(result.get(key))
+        if value:
+            return value
+
+    for key in ("notebook", "item", "instance"):
+        nested = result.get(key)
+        if isinstance(nested, dict):
+            value = _extract_notebook_id(nested)
+            if value:
+                return value
+    return ""
+
+
+def _resolve_created_notebook_id(
+    *,
+    name: str,
+    workspace_id: str,
+    session: WebSession,
+) -> str:
+    try:
+        items = _list_notebooks_for_workspace(
+            session,
+            base_url=get_base_url(),
+            workspace_id=workspace_id,
+            user_ids=[],
+            keyword=name,
+            page_size=20,
+        )
+    except Exception:
+        return ""
+
+    matches = [item for item in items if str(item.get("name") or "") == name]
+    for item in _sort_notebook_items(matches):
+        notebook_id = _notebook_id_from_item(item)
+        if notebook_id:
+            return notebook_id
+    return ""
 
 
 def resolve_notebook_project(
@@ -185,6 +347,7 @@ def create_notebook_and_report(
     *,
     name: str,
     resource_display: str,
+    diagnostics: NotebookCreateDiagnostics,
     selected_project,
     selected_image,
     quota: ResolvedQuota,
@@ -196,7 +359,10 @@ def create_notebook_and_report(
     task_priority: Optional[int] = None,
 ) -> str | None:
     try:
-        resource_spec_price = build_resource_spec_price(quota=quota)
+        resource_spec_price = build_resource_spec_price(
+            quota=quota,
+            shared_memory_size=shm_size,
+        )
         result = browser_api_module.create_notebook(
             name=name,
             project_id=selected_project.project_id,
@@ -217,7 +383,25 @@ def create_notebook_and_report(
             resource_spec_price=resource_spec_price,
         )
 
-        notebook_id = result.get("notebook_id", "")
+        notebook_id = _extract_notebook_id(result)
+        if not notebook_id:
+            notebook_id = _resolve_created_notebook_id(
+                name=name,
+                workspace_id=workspace_id,
+                session=session,
+            )
+        if not notebook_id:
+            _handle_error(
+                ctx,
+                "APIError",
+                f"Notebook '{name}' was submitted, but the platform response did not expose a usable notebook id.",
+                EXIT_API_ERROR,
+                hint=_format_create_diagnostics(
+                    diagnostics,
+                    reason="Create API response did not include notebook_id/id, and live lookup by name did not find the new notebook.",
+                ),
+            )
+            return None
 
         if json_output:
             workspace_name = (getattr(session, "all_workspace_names", None) or {}).get(
@@ -241,15 +425,29 @@ def create_notebook_and_report(
             )
         else:
             click.echo("\nNotebook created successfully!")
-            click.echo(f"  ID: {notebook_id}")
             click.echo(f"  Name: {name}")
+            click.echo(f"  Workspace: {diagnostics.workspace}")
+            click.echo(f"  Project: {selected_project.name}")
             click.echo(f"  Resource: {resource_display}")
             click.echo(f"  Compute group: {quota.compute_group_name}")
+            click.echo(f"  Image: {selected_image.name}")
+            quoted_name = shlex.quote(name)
+            click.echo("  Next:")
+            click.echo(f"    inspire notebook events {quoted_name}")
+            click.echo(f"    inspire notebook ssh {quoted_name}")
+            click.echo(f"    inspire notebook exec {quoted_name} \"pwd\"")
+            click.echo(f"    inspire notebook delete {quoted_name} --yes")
 
         return notebook_id
 
     except Exception as e:
-        _handle_error(ctx, "APIError", f"Failed to create notebook: {e}", EXIT_API_ERROR)
+        _handle_error(
+            ctx,
+            "APIError",
+            f"Failed to create notebook '{name}': {e}",
+            EXIT_API_ERROR,
+            hint=_format_create_diagnostics(diagnostics, reason=str(e)),
+        )
         return None
 
 
@@ -257,6 +455,7 @@ def maybe_wait_for_running(
     ctx: Context,
     *,
     notebook_id: str,
+    diagnostics: NotebookCreateDiagnostics,
     session: WebSession,
     wait: bool,
     needs_post_start: bool,
@@ -282,26 +481,55 @@ def maybe_wait_for_running(
             click.echo("Notebook is now RUNNING.")
         return True
     except NotebookFailedError as e:
-        msg = f"Notebook failed to start: {e}"
+        detail = e.detail or {}
+        reason_parts = [f"terminal status: {e.status}"]
+        sub_status = _first_non_empty_str(detail.get("sub_status"))
+        if sub_status:
+            reason_parts.append(f"sub-status: {sub_status}")
         hint_parts = []
-        if e.events:
-            hint_parts.append(e.events)
-        extra = e.detail.get("extra_info") or {}
+        events = _sanitize_notebook_id(e.events or "", notebook_id)
+        if events:
+            hint_parts.append(events)
+        else:
+            fetched_events = _sanitize_notebook_id(
+                _fetch_event_preview(notebook_id, session),
+                notebook_id,
+            )
+            if fetched_events:
+                hint_parts.append(fetched_events)
+        extra = detail.get("extra_info") or {}
         for key in ("NodeName", "HostIP"):
             if extra.get(key):
                 hint_parts.append(f"{key}: {extra[key]}")
-        if not hint_parts:
-            hint_parts.append(
-                "Check Events tab in web UI: Jobs > Interactive Modeling > notebook detail"
-            )
-        _handle_error(ctx, "NotebookFailed", msg, EXIT_API_ERROR, hint="\n".join(hint_parts))
+        events_hint = "\n".join(hint_parts)
+        _handle_error(
+            ctx,
+            "NotebookFailed",
+            f"Notebook '{diagnostics.name}' failed to start.",
+            EXIT_API_ERROR,
+            hint=_format_create_diagnostics(
+                diagnostics,
+                reason="; ".join(reason_parts),
+                events=events_hint,
+            ),
+        )
         return False
     except TimeoutError as e:
+        events_hint = _sanitize_notebook_id(
+            _fetch_event_preview(notebook_id, session),
+            notebook_id,
+        )
+        reason = _sanitize_notebook_id(str(e), notebook_id)
         _handle_error(
             ctx,
             "Timeout",
-            f"Timed out waiting for notebook to reach RUNNING: {e}",
+            f"Timed out waiting for notebook '{diagnostics.name}' to reach RUNNING.",
             EXIT_API_ERROR,
+            hint=_format_create_diagnostics(
+                diagnostics,
+                reason=reason,
+                events=events_hint,
+            ),
         )
         return False
 
@@ -310,6 +538,7 @@ def maybe_run_post_start(
     ctx: Context,
     *,
     notebook_id: str,
+    diagnostics: NotebookCreateDiagnostics | None = None,
     session: WebSession,
     post_start_spec: NotebookPostStartSpec | None,
     gpu_count: int,
@@ -333,7 +562,13 @@ def maybe_run_post_start(
         )
         if not json_output and started:
             click.echo(f"{post_start_spec.label} started (log: {post_start_spec.log_path})")
-            click.echo(f'  To stop: inspire notebook exec "kill $(cat {post_start_spec.pid_file})"')
+            if diagnostics is not None:
+                quoted_name = shlex.quote(diagnostics.name)
+                click.echo(
+                    f'  To stop: inspire notebook exec {quoted_name} "kill $(cat {post_start_spec.pid_file})"'
+                )
+            else:
+                click.echo(f'  To stop: inspire notebook exec "kill $(cat {post_start_spec.pid_file})"')
         if not json_output and not started:
             click.echo(
                 f"Warning: Failed to confirm {post_start_spec.label.lower()} startup; check "
@@ -343,6 +578,18 @@ def maybe_run_post_start(
     except Exception as e:
         if not json_output:
             click.echo(f"Warning: Failed to start {post_start_spec.label.lower()}: {e}", err=True)
+            if diagnostics is not None:
+                click.echo(
+                    _format_create_diagnostics(
+                        diagnostics,
+                        reason=f"post-start failed: {e}",
+                        events=_sanitize_notebook_id(
+                            _fetch_event_preview(notebook_id, session),
+                            notebook_id,
+                        ),
+                    ),
+                    err=True,
+                )
 
 
 def _resolve_create_inputs(
@@ -414,7 +661,7 @@ def _cap_task_priority(
 
     if not json_output:
         click.echo(
-            f"Capping priority {task_priority} → {max_priority} "
+            f"Capping priority {task_priority} -> {max_priority} "
             f"(max for project '{selected_project.name}')"
         )
     return max_priority
@@ -653,11 +900,26 @@ def run_notebook_create(
         click.echo(f"Using image: {selected_image.name}")
 
     name = _resolve_notebook_name(name, json_output=json_output)
+    workspace_label = _workspace_label(
+        workspace_id=workspace_id,
+        session=session,
+        config=config,
+        requested_workspace=workspace,
+    )
+    diagnostics = NotebookCreateDiagnostics(
+        name=name,
+        workspace=workspace_label,
+        project=selected_project.name,
+        image=selected_image.name,
+        resource=resource_display,
+        compute_group=resolved_quota.compute_group_name,
+    )
 
     notebook_id = create_notebook_and_report(
         ctx,
         name=name,
         resource_display=resource_display,
+        diagnostics=diagnostics,
         selected_project=selected_project,
         selected_image=selected_image,
         quota=resolved_quota,
@@ -674,6 +936,7 @@ def run_notebook_create(
     if not maybe_wait_for_running(
         ctx,
         notebook_id=notebook_id,
+        diagnostics=diagnostics,
         session=session,
         wait=wait,
         needs_post_start=(post_start_spec is not None),
@@ -685,6 +948,7 @@ def run_notebook_create(
     maybe_run_post_start(
         ctx,
         notebook_id=notebook_id,
+        diagnostics=diagnostics,
         session=session,
         post_start_spec=post_start_spec,
         gpu_count=resolved_quota.gpu_count,

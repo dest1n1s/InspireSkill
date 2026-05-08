@@ -176,8 +176,8 @@ def maybe_spawn_check() -> None:
             return
 
     # Resolve the `inspire` entry point the child should run. Prefer the same
-    # interpreter we're running under so uv tool / pipx / editable installs
-    # all work without relying on PATH resolution.
+    # interpreter we're running under so uv tool / pipx installs all work
+    # without relying on PATH resolution.
     cmd = [sys.executable, "-m", "inspire.cli.main", "update", "--check", "--silent"]
     env = os.environ.copy()
     env[_SKIP_ENV] = "1"

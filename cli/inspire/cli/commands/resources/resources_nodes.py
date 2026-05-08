@@ -19,6 +19,7 @@ from inspire.cli.utils.errors import exit_with_error as _handle_error
 from inspire.platform.web.session import SessionExpiredError, get_web_session
 from inspire.config import Config, ConfigError
 from inspire.config.workspaces import select_workspace_id
+from .table import render_table
 
 
 def _workspace_name_map(
@@ -118,7 +119,7 @@ def list_nodes(
         filtered: list[dict] = []
         group_lower = (group or "").lower()
         for c in counts:
-            name = c.group_name or name_map.get(c.group_id, c.group_id[-12:])
+            name = c.group_name or name_map.get(c.group_id, "") or "Unknown"
             if group_lower and group_lower not in name.lower():
                 continue
             # Use accurate available GPUs if available, otherwise fall back to computed
@@ -158,22 +159,19 @@ def list_nodes(
         click.echo("")
         click.echo("📊 Full-Free 8-GPU Nodes by Compute Group")
         if show_workspace:
-            click.echo("─" * 94)
-            click.echo(
-                f"{'Workspace':<16} {'Group':<25} {'Full Free':>10} {'Ready':>8} {'Total':>8} {'Free GPUs':>10}"
-            )
-            click.echo("─" * 94)
+            headers = ("Workspace", "Group", "Full Free", "Ready", "Total", "Free GPUs", "")
+            widths = [16, 25, 10, 8, 8, 10, 2]
+            aligns = ["left", "left", "right", "right", "right", "right", "left"]
         else:
-            click.echo("─" * 78)
-            click.echo(
-                f"{'Group':<25} {'Full Free':>10} {'Ready':>8} {'Total':>8} {'Free GPUs':>10}"
-            )
-            click.echo("─" * 78)
+            headers = ("Group", "Full Free", "Ready", "Total", "Free GPUs", "")
+            widths = [25, 10, 8, 8, 10, 2]
+            aligns = ["left", "right", "right", "right", "right", "left"]
 
         total_full_free = 0
         total_free_gpus = 0
+        table_rows = []
         for row in filtered:
-            name = row["group_name"][:24]
+            name = row["group_name"]
             full_free = row["full_free_nodes"]
             ready = row["ready_nodes"]
             total = row["total_nodes"]
@@ -192,21 +190,27 @@ def list_nodes(
                 indicator = "🔴"
 
             if show_workspace:
-                click.echo(
-                    f"{row['workspace_name'][:15]:<16} {name:<25} {full_free:>10} {ready:>8} {total:>8} {free_gpus:>10} {indicator}"
+                table_rows.append(
+                    (
+                        row["workspace_name"],
+                        name,
+                        full_free,
+                        ready,
+                        total,
+                        free_gpus,
+                        indicator,
+                    )
                 )
             else:
-                click.echo(
-                    f"{name:<25} {full_free:>10} {ready:>8} {total:>8} {free_gpus:>10} {indicator}"
-                )
+                table_rows.append((name, full_free, ready, total, free_gpus, indicator))
 
-        click.echo("─" * (94 if show_workspace else 78))
         if show_workspace:
-            click.echo(
-                f"{'TOTAL':<16} {'':<25} {total_full_free:>10} {'':>8} {'':>8} {total_free_gpus:>10}"
-            )
+            table_rows.append(("TOTAL", "", total_full_free, "", "", total_free_gpus, ""))
         else:
-            click.echo(f"{'TOTAL':<25} {total_full_free:>10} {'':>8} {'':>8} {total_free_gpus:>10}")
+            table_rows.append(("TOTAL", total_full_free, "", "", total_free_gpus, ""))
+        click.echo(
+            "\n".join(render_table(headers, table_rows, widths, aligns=aligns, line_char="─"))
+        )
         click.echo("")
         click.echo("Full Free = READY nodes with 8 GPUs and no running tasks")
         click.echo("Free GPUs = Total available GPUs (matches 'inspire resources list')")

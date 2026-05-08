@@ -2130,6 +2130,83 @@ def _substitute_storage_tier(path: str, new_tier: str) -> str:
     return path
 
 
+def _extract_project_topic(path: str) -> str | None:
+    parts = [p for p in str(path or "").split("/") if p]
+    try:
+        idx = parts.index("project")
+    except ValueError:
+        return None
+    if idx + 1 >= len(parts):
+        return None
+    topic = parts[idx + 1].strip()
+    return topic or None
+
+
+def _default_path_aliases(
+    *,
+    account_key: str,
+    project_topic: str,
+    selected_tier: str,
+) -> dict[str, str]:
+    user = str(account_key or "").strip().strip("/")
+    topic = str(project_topic or "").strip().strip("/")
+    if not user or not topic:
+        return {}
+
+    tier_names = set(_STORAGE_TIER_NAMES)
+    if selected_tier not in tier_names:
+        selected_tier = "ssd"
+
+    aliases: dict[str, str] = {}
+    for tier in _STORAGE_TIER_NAMES:
+        me = f"/inspire/{tier}/project/{topic}/{user}/"
+        public = f"/inspire/{tier}/project/{topic}/public/"
+        global_me = f"/inspire/{tier}/global_user/{user}/"
+        aliases[f"{tier}.me"] = me
+        aliases[f"{tier}.public"] = public
+        aliases[f"{tier}.global-me"] = global_me
+        if tier == selected_tier:
+            aliases["me"] = me
+            aliases["public"] = public
+            aliases["global-me"] = global_me
+    return aliases
+
+
+def _persist_default_path_aliases(
+    *,
+    project_data: dict[str, Any],
+    account_key: str,
+    selected_project: object,
+    project_catalog: dict[str, dict[str, Any]],
+    target_dir: str | None,
+    force: bool,
+) -> None:
+    project_id = str(getattr(selected_project, "project_id", "") or "").strip()
+    entry = project_catalog.get(project_id, {})
+    project_topic = str(entry.get("path") or "").strip()
+    if not project_topic:
+        project_topic = _extract_project_topic(target_dir or "") or ""
+    if not project_topic:
+        return
+
+    selected_tier = _detect_storage_tier(target_dir or "") or "ssd"
+    defaults = _default_path_aliases(
+        account_key=account_key,
+        project_topic=project_topic,
+        selected_tier=selected_tier,
+    )
+    if not defaults:
+        return
+
+    existing = project_data.get("path_aliases")
+    if not isinstance(existing, dict):
+        existing = {}
+        project_data["path_aliases"] = existing
+    for alias, path in defaults.items():
+        if force or not str(existing.get(alias) or "").strip():
+            existing[alias] = path
+
+
 def _prompt_storage_tier(current_path: str) -> str:
     """Ask the user to pick an Inspire storage tier.
 
@@ -2335,6 +2412,9 @@ def _write_discovered_project_config(
     config: Config,
     account_key: str,
     selected_alias: str,
+    selected_project: object,
+    project_catalog: dict[str, dict[str, Any]],
+    force: bool,
     target_dir: str | None = None,
 ) -> None:
     # Build [context] from the discovered state and copy defaults that the
@@ -2350,6 +2430,15 @@ def _write_discovered_project_config(
     if target_dir:
         paths_section = _get_or_create_dict_table(container=project_data, key="paths")
         paths_section["target_dir"] = target_dir
+
+    _persist_default_path_aliases(
+        project_data=project_data,
+        account_key=account_key,
+        selected_project=selected_project,
+        project_catalog=project_catalog,
+        target_dir=target_dir,
+        force=force,
+    )
 
     # Strip everything that isn't per-repo state — a single account may use
     # many repos, and every one duplicating the workspace/compute_groups
@@ -2640,6 +2729,9 @@ def _persist_discovery_catalog(request: _DiscoveryPersistRequest) -> None:
         config=config,
         account_key=account_key,
         selected_alias=selected_alias,
+        selected_project=selected_project,
+        project_catalog=project_catalog,
+        force=force,
         target_dir=target_dir,
     )
 

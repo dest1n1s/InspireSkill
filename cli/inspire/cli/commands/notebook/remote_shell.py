@@ -24,7 +24,7 @@ from inspire.cli.utils.tunnel_reconnect import (
     retry_pause_seconds,
     should_attempt_ssh_reconnect,
 )
-from inspire.config import Config, ConfigError, build_env_exports
+from inspire.config import Config, ConfigError, build_env_exports, resolve_remote_cwd
 from inspire.platform.web import browser_api as browser_api_module
 
 logger = logging.getLogger(__name__)
@@ -33,8 +33,13 @@ _RUNNING_NOTEBOOK_STATUS = "RUNNING"
 
 @click.command("ssh")
 @click.argument("notebook", required=False)
+@click.option(
+    "--cwd",
+    default=None,
+    help="Remote working directory or path alias (default: [paths].target_dir)",
+)
 @pass_context
-def bridge_ssh(ctx: Context, notebook: Optional[str]) -> None:
+def bridge_ssh(ctx: Context, notebook: Optional[str], cwd: Optional[str]) -> None:
     """Open an interactive SSH shell to a cached notebook.
 
     Requires a cached notebook connection with a reachable SSH tunnel.
@@ -44,6 +49,7 @@ def bridge_ssh(ctx: Context, notebook: Optional[str]) -> None:
     Example:
         inspire notebook ssh my-notebook
         inspire notebook shell my-notebook
+        inspire notebook shell my-notebook --cwd me
     """
     if notebook is not None:
         from inspire.cli.utils.id_resolver import reject_id_at_boundary
@@ -56,7 +62,12 @@ def bridge_ssh(ctx: Context, notebook: Optional[str]) -> None:
         )
     bridge = notebook
     try:
-        config, _ = Config.from_files_and_env(require_target_dir=True, require_credentials=False)
+        config, _ = Config.from_files_and_env(require_target_dir=False, require_credentials=False)
+        config.target_dir = resolve_remote_cwd(
+            cwd=cwd,
+            target_dir=config.target_dir,
+            aliases=config.path_aliases,
+        )
     except ConfigError as e:
         _handle_error(ctx, "ConfigError", str(e), EXIT_CONFIG_ERROR)
 

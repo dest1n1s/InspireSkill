@@ -122,6 +122,9 @@ class Config:
     # Remote environment variables (injected into bridge exec, jobs, run commands)
     remote_env: dict[str, str] = field(default_factory=dict)
 
+    # Project-scoped remote path aliases used by notebook exec/shell/scp.
+    path_aliases: dict[str, str] = field(default_factory=dict)
+
     # Source precedence: "env" (default) = env vars win, "toml" = project TOML wins
     prefer_source: str = "env"
 
