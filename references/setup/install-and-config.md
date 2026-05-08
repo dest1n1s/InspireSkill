@@ -1,0 +1,108 @@
+# 安装、更新与初始化
+
+## 什么时候加载
+
+当用户需要安装 InspireSkill、更新 CLI / Skill 文件、配置账号、初始化项目，或排查安装后的 PATH / installer 问题时，加载本文档。
+
+## 1. 平台支持
+
+macOS + Linux 是一等公民。Windows 用户请用 WSL2；CLI 依赖 SSH、rsync、GPFS 目录约定和 POSIX 文件权限，Windows 原生不在 roadmap。
+
+## 2. 安装
+
+前置：`bash`、`curl`、`tar`、Python 3.10+，以及 `uv`（推荐）或 `pipx` 任一。两个都没装就先装 `uv`：
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+然后一行装好 InspireSkill：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/realZillionX/InspireSkill/main/scripts/install.sh | bash
+```
+
+不需要把仓库克隆到本地。脚本会：
+
+1. 从 PyPI 用 `uv tool install` / `pipx install` 安装 `inspire-skill`。
+2. 确保 `~/.local/bin` 在 PATH 上。
+3. 探测本机 harness，并把 `SKILL.md` 与 `references/` 安装到对应 skill 目录。
+4. macOS 上安装每日静默版本检查的 launchd agent。
+
+可选参数：
+
+```bash
+curl -fsSL .../install.sh | bash -s -- --harness claude
+curl -fsSL .../install.sh | bash -s -- --harness claude,codex
+curl -fsSL .../install.sh | bash -s -- --no-cli
+curl -fsSL .../install.sh | bash -s -- --no-schedule
+```
+
+常见问题：
+
+- 装完后 `inspire: command not found`：运行 `exec $SHELL` 或开新终端。
+- `installer failed` / 镜像超时：中国大陆可临时用 `UV_DEFAULT_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple curl ... | bash`。
+- 同一台机器已经装过：直接重跑安装脚本，脚本是幂等的。
+
+## 3. 更新
+
+```bash
+inspire update                # CLI 包 + SKILL/references 一起升到最新
+inspire update --check        # 只检查，不动
+inspire update --cli-only     # 仅升 Python 包
+inspire update --skill-only   # 仅刷 SKILL.md / references/
+```
+
+`inspire update` 会自动识别当前安装由 `uv tool` 还是 `pipx` 管理，并调用对应升级命令。
+
+从 v3.0.3 之前的版本升级时，先重跑一次安装脚本：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/realZillionX/InspireSkill/main/scripts/install.sh | bash
+```
+
+落到 v3.0.3 之后，后续 patch 直接 `inspire update`。
+
+## 4. 账号级初始化
+
+账号配置和仓库无关，任意目录运行：
+
+```bash
+inspire account add <name>
+inspire config show --compact
+```
+
+`inspire account add` 会询问平台 username、password、base URL、代理和是否设为活动账号。结果写入 `~/.inspire/accounts/<name>/config.toml`，包含身份、`base_url`、代理等。
+
+账号配置不包含 `target_dir`。`target_dir` 是项目级远端工作目录，必须在仓库中初始化。
+
+## 5. 项目级初始化
+
+每个本地仓库各做一次：
+
+```bash
+cd /path/to/your-repo
+inspire init --discover
+inspire resources list --all --include-cpu
+```
+
+`init --discover` 会发现可用项目、workspace、compute group 和远端存储池，并写入：
+
+- 账号级发现结果：`~/.inspire/accounts/<name>/config.toml`
+- 当前仓库项目上下文：`./.inspire/config.toml`
+
+CLI 会拒绝账号 config.toml 中出现 `[paths]`，避免项目级路径污染所有仓库。
+
+## 6. 多账号
+
+```bash
+inspire account add <name2>
+inspire account use <name>
+inspire account current
+```
+
+每个账号的 config、SSH tunnel bridges 和 SSO session cache 都放在 `~/.inspire/accounts/<name>/` 下；活动账号由 `~/.inspire/current` 选择。
+
+## 7. 代理 setup
+
+不常驻 SII 的科研人员通常需要让本机代理同时转发公网和 `*.sii.edu.cn` 流量。Clash Verge 示例和账号级代理衔接见 [proxy-setup.md](proxy-setup.md)。

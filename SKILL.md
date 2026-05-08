@@ -5,9 +5,9 @@ description: "Execution-first Inspire platform playbook for agents driving the i
 
 # Inspire Skill
 
-## 1. 常驻硬约束
-
 把 `inspire` CLI 当黑盒使用。不要读 CLI 源码来猜平台状态；状态、事件、日志、资源余量都通过命令实时查询。
+
+## 1. 运维约束
 
 | 主题 | 约束 |
 | --- | --- |
@@ -72,16 +72,16 @@ Notebook 细节、镜像固化、远程命令语义和大文件操作：加载 [
 
 GPU job、HPC 两层资源模型、Ray 适用边界和示例：加载 [references/compute-workloads.md](references/compute-workloads.md)。
 
-### 2.4 镜像和较少使用命令
+### 2.4 镜像、部署和只读辅助命令
 
 | 命令 | 用途 |
 | --- | --- |
 | `inspire image list --source all` | 浏览镜像 |
 | `inspire image save <notebook-name> -n X -v v1 --public --wait` | 从 notebook 保存镜像 |
 | `inspire image set-default --job URL --notebook URL` | 写入项目默认镜像 |
-| `inspire serving list`、`inspire model list`、`inspire user api-keys` | 权限受限或低频只读命令 |
-
-低频命令加载 [references/less-used-commands.md](references/less-used-commands.md)。
+| `inspire serving list`、`inspire serving status <name>`、`inspire serving metrics <name>` | 模型部署观测；权限受限，创建优先走 Web UI |
+| `inspire model list`、`inspire model versions <model-id>` | 模型注册表只读浏览 |
+| `inspire project detail <project-id>`、`inspire user api-keys` | 项目 / 用户 metadata 查询 |
 
 ## 3. 按需加载索引
 
@@ -91,9 +91,9 @@ GPU job、HPC 两层资源模型、Ray 适用边界和示例：加载 [reference
 | 要创建、连接、执行、传文件、保存镜像或维护 notebook | [references/notebook.md](references/notebook.md) |
 | 要提交 GPU job、CPU HPC、Ray，或解释优先级和调度事件 | [references/compute-workloads.md](references/compute-workloads.md) |
 | 要按 CPU 准备、数据处理、训练三阶段推进项目 | [references/workflows.md](references/workflows.md) |
-| SSH bootstrap、rtunnel、HPC 异常、大规模文件操作或失败排障 | [references/troubleshooting.md](references/troubleshooting.md) |
-| 代理方案、Clash Verge 示例和账号级代理配置 | [references/proxy-setup.md](references/proxy-setup.md) |
-| OpenAPI 合约或 Browser API 端点背景 | [references/openapi.md](references/openapi.md)、[references/browser-api.md](references/browser-api.md) |
+| SSH bootstrap、大规模文件操作或 notebook 远程命令排障 | [references/notebook.md](references/notebook.md) |
+| 安装、更新、账号初始化或代理 setup | [references/setup/install-and-config.md](references/setup/install-and-config.md)、[references/setup/proxy-setup.md](references/setup/proxy-setup.md) |
+| OpenAPI 合约或 Browser API 端点背景 | [references/dev/openapi.md](references/dev/openapi.md)、[references/dev/browser-api.md](references/dev/browser-api.md) |
 
 ## 4. `--quota` 通用格式
 

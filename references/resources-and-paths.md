@@ -67,3 +67,18 @@ inspire config context
 ```
 
 不要把配置文件内容复制到 Agent 文档里；仓库级语义说明写在 `INSPIRE.md`。
+
+## 7. 项目、负责人和用户元数据
+
+日常看配额、预算和优先级用 `inspire project list`。更细的项目详情和负责人下拉只在确认归属或预算拆分时使用：
+
+| 命令 | 用途 |
+| --- | --- |
+| `inspire project detail <project-id>` | 单项目详情：预算 / 子项目预算 / 优先级 / 创建人 |
+| `inspire project owners` | 全局负责人下拉清单 |
+| `inspire user whoami` | 当前登录身份 |
+| `inspire user permissions --workspace <name>` | 当前账号在 workspace 内的权限码 |
+| `inspire user quota` | 用户级配额，普通账号通常不可用，失败时改看 `project list` |
+| `inspire user api-keys` | 当前用户 API Key 元数据；不会返回 key 值 |
+
+API Key 值只在创建时一次性下发；创建 / 删除走 Web UI `/userCenter`。

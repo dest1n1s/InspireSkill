@@ -7,7 +7,7 @@
 
 ## 什么时候用它
 
-- `references/browser-api.md` 里的某个端点报 `404` / 字段错
+- `references/dev/browser-api.md` 里的某个端点报 `404` / 字段错
 - 想加一个 `inspire <x>` 新命令，但不确定后端 body schema 是什么
 - 定期（季度 / 半年）体检，确认 CLI 封装的端点都还活着
 - 发现了完全没见过的端点（比如前端新加了功能）
@@ -30,7 +30,7 @@ cd cli
 uv run playwright install chromium
 ```
 
-代理：`INSPIRE_PLAYWRIGHT_PROXY` 环境变量或 `--proxy` 参数（默认 `http://127.0.0.1:7897`，与 `references/proxy-setup.md` 对齐）。
+代理：`INSPIRE_PLAYWRIGHT_PROXY` 环境变量或 `--proxy` 参数（默认 `http://127.0.0.1:7897`，与 `references/setup/proxy-setup.md` 对齐）。
 
 ## 典型跑法
 
@@ -90,7 +90,7 @@ uv run python scripts/reverse_capture/analyze.py /tmp/bapi.jsonl /tmp/bapi-gpu.j
 
 输出会告诉你：
 - **NEW 端点**：这些当前 known set 里没有；如果确认是新的稳定接口，手动加到
-  `known_endpoints.py` 并考虑在 CLI / `references/browser-api.md` 里暴露。
+  `known_endpoints.py` 并考虑在 CLI / `references/dev/browser-api.md` 里暴露。
 - **KNOWN now 404**：后端很可能退役；往 `STALE_SINCE_2026_04` 里挪，并在 CLI 里改走
   替代路径（参考 [notebooks.py 在 2026-04 的迁移](../../inspire/platform/web/browser_api/notebooks.py)）。
 - **KNOWN not triggered**：导航没点到 / 是 destructive endpoint。前者可以加路由，
@@ -110,4 +110,4 @@ uv run python scripts/reverse_capture/analyze.py /tmp/bapi.jsonl /tmp/bapi-gpu.j
 
 ## 历史背景
 
-本工具是 2026-04 一轮 10 round 抓包后沉淀下来的 —— 当时确认了 Browser API 已悄悄下线了 3 个 CLI 还在调的端点（`GET /notebook/{id}/events`、`GET /notebook/event/{id}`、`POST /notebook/compute_groups`），同时挖出 40+ 条 CLI 当前不封装的新端点（`inference_servings/*`、`model/*`、`user/permissions/{id}`、`workspace/list`、`ssh/*`、`lifecycle/list`、`run_index/list` 等）。详细过程见 [references/browser-api.md](../../../references/browser-api.md) 的"已失效"注释。
+本工具是 2026-04 一轮 10 round 抓包后沉淀下来的 —— 当时确认了 Browser API 已悄悄下线了 3 个 CLI 还在调的端点（`GET /notebook/{id}/events`、`GET /notebook/event/{id}`、`POST /notebook/compute_groups`），同时挖出 40+ 条 CLI 当前不封装的新端点（`inference_servings/*`、`model/*`、`user/permissions/{id}`、`workspace/list`、`ssh/*`、`lifecycle/list`、`run_index/list` 等）。详细过程见 [references/dev/browser-api.md](../../../references/dev/browser-api.md) 的"已失效"注释。

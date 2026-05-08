@@ -1,6 +1,6 @@
 """Inference serving (model deployment) helpers for the OpenAPI client.
 
-Official spec: [references/openapi.md](../../../../references/openapi.md) §3.
+Official spec: [references/dev/openapi.md](../../../../references/dev/openapi.md) §3.
 The 3 endpoints wrapped here — `create`, `detail`, `stop` — are Bearer-token
 authenticated. For list / configs / available project+user, see
 `platform.web.browser_api.servings` (Browser API only).

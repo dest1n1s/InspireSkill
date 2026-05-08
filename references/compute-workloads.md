@@ -126,3 +126,29 @@ inspire ray events <name> --tail 50
 ```
 
 `job` 和 `ray` 可以进一步看 pod/instance 级原因；HPC 只暴露 job-level 事件。
+
+## 6. HPC 异常状态对照
+
+| 现象 | 优先怀疑 |
+| --- | --- |
+| `slurmctld BackOff` | 镜像不带 Slurm 运行环境 |
+| `steps=-/0` | 正文没用 `srun` 启动程序 |
+| `nodes=[]` | 调度未分配；可能是配额 / 优先级问题 |
+| `status=SUCCEEDED` 但目录 / `stdout.log` / 报告为空 | CPU 并发或内存贴边；应用层应留 `cpus-per-task - 4` 和约 $$384$$ MB 内存余量 |
+| `quota match failed` / $$0$$ 候选 | `--quota gpu,cpu,mem` 在当前 workspace 找不到对应规格。用 `inspire resources specs --usage hpc` 重选；多组撞名时加 `--group <name>` 消歧 |
+| `image not found` | 镜像地址不完整；必须是 `host/namespace/name:tag` 全形式 |
+| `429` | 已内置退避；持续失败就等几分钟 |
+
+## 7. 模型部署：`serving`
+
+`inspire serving` 面向模型部署服务，普通训练 / 预处理任务不要走它。账号需有 `inference_serving.create` 或等价权限；普通账号在 Web UI 上点"部署服务"可能被静默踢回首页，CLI create 也不会可靠。
+
+| 命令 | 用途 |
+| --- | --- |
+| `inspire serving list [-a\|--all]` | 默认只列当前用户部署；`-a` 列 workspace 全量 |
+| `inspire serving status <serving-id>` | 单个部署详情 |
+| `inspire serving stop <serving-id>` | 止损 |
+| `inspire serving configs` | workspace 可用镜像 / 规格组合 |
+| `inspire serving metrics <name>` | 多副本部署资源视图时间序列，默认输出 PNG 和 per-replica stats |
+
+`list` / `configs` 只在 Browser API；`status` / `stop` OpenAPI 和 Browser API 都有，CLI 优先选 OpenAPI。创建部署的参数过多且强绑定 Web 表单，CLI 暂不覆盖，直接用 Web UI `/jobs/modelDeployment`。
