@@ -245,7 +245,7 @@ def check_config(ctx: Context, json_output_local: bool) -> None:
         if base_url_resolution["source"] == SOURCE_DEFAULT:
             default_base_url_hint = (
                 "Base URL is using default fallback. Set [api] base_url in "
-                "./.inspire/config.toml or export INSPIRE_BASE_URL."
+                "./.inspire/config.toml or run inspire account add."
             )
 
         result = {

@@ -2130,8 +2130,8 @@ def _get_or_create_dict_table(
 
 # Storage tiers exposed under `/inspire/<tier>/project/<proj>/...`. Ordered
 # with the best default first so `ssd` is the suggested tier when the catalog
-# workdir cannot be parsed. See `references/dev/browser-api.md` / SKILL.md for
-# the empirical capacity and throughput data behind these choices.
+# workdir cannot be parsed. See `references/resources-and-paths.md` for the
+# storage-tier guidance behind these choices.
 _STORAGE_TIERS: tuple[tuple[str, str], ...] = (
     ("ssd",     "gpfs_flash — fast tier, best for training hot path / active working set"),
     ("hdd",     "gpfs_hdd — general purpose; project fileset fills up fast, watch quota"),

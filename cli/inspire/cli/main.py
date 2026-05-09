@@ -61,8 +61,8 @@ def _apply_profile_option(
     "json_output",
     is_flag=True,
     help=(
-        "Output as JSON for scripts. Agent-facing and interactive use should keep "
-        "the default human format."
+        "Output as JSON for scripts. Interactive use should keep the default "
+        "human format."
     ),
 )
 @click.option(
@@ -79,7 +79,7 @@ def main(ctx: Context, json_output: bool, debug: bool) -> None:
 
     \b
     Output:
-        Default human output is the Agent-facing observation surface.
+        Default human output is the interactive observation surface.
         Use JSON only for scripts or structured automation.
 
     \b

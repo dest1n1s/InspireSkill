@@ -37,7 +37,7 @@ inspire run 'bash <repo>/train.sh' -q 8,160,1800 --nodes 2 \
 inspire job create -n <name>-train -q 8,160,1800 --nodes 2 \
   -c 'bash <repo>/train.sh' --workspace <WORKSPACE> --group <GROUP> \
   --image <IMAGE_URL> --priority 5 && \
-inspire job logs --watch <name>-train
+inspire job logs --follow <name>-train
 ```
 
 不指定 `--name` 时 `run` 自动生成 job 名。
