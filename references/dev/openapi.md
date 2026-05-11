@@ -26,7 +26,7 @@
 | 名称 | 说明 |
 | --- | --- |
 | 账号 | 启智平台的身份凭证，资源归属与计量的主体。使用前需注册生成，用于启智控制台登录和 OpenAPI 调用。 |
-| Token | 数字身份标识，携带用户信息。调用 OpenAPI 前需通过账号（用户名/密码）交换 Bearer Token，并在请求头中携带。 |
+| Token | 数字身份标识，携带账号信息。调用 OpenAPI 前需通过账号（账号名/密码）交换 Bearer Token，并在请求头中携带。 |
 
 请求头统一示例：
 
@@ -63,7 +63,7 @@ curl --location 'https://qz.sii.edu.cn/openapi/v1/train_job/create' \
 
 | 参数 | 类型 | 必选 | 说明 |
 | --- | --- | --- | --- |
-| username | String | 是 | 用户名 |
+| username | String | 是 | 账号名 |
 | password | String | 是 | 密码 |
 
 ```bash

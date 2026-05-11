@@ -7,7 +7,7 @@ description: "Execution-first Inspire platform CLI usage manual, with on-demand 
 
 `inspire` 是启智平台的本地命令入口。本文档只描述可观察、可执行的黑盒用法：命令是否存在、参数叫什么、默认值是什么，以 CLI help 为准；资源、项目、事件、日志和指标，以实时查询为准；不把内部接口、实现结构或历史行为当作使用事实。
 
-同一份手册同时服务人类和模型。适合人类快速判断的表达，也应该适合模型稳定执行；不区分两套原则。
+同一份手册只服务 Agent。适合快速判断的表达，也应该适合稳定执行；不按操作者身份区分两套原则。
 
 ## 1. 平台使用模型
 
@@ -75,7 +75,7 @@ uv run inspire hpc create --help
 | 浏览或注册模型仓库条目，判断 model registry 和 serving 的关系 | [references/model.md](references/model.md) |
 | 安装、更新、账号、项目初始化、代理 setup | [references/setup/install-and-config.md](references/setup/install-and-config.md)、[references/setup/proxy-setup.md](references/setup/proxy-setup.md) |
 
-开发者手册只在维护 CLI 封装、排查平台接口合约，或用户明确要求看接口时读取：
+开发者手册只在维护 CLI 封装、排查平台接口合约，或 Agent 明确要求看接口时读取：
 
 | 场景 | 手册 |
 | --- | --- |

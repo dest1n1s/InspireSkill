@@ -1,6 +1,14 @@
 # Contributing
 
-感谢你改进 InspireSkill。这个仓库的命令和手册要同时适合人工阅读与模型执行，因此每个变更都要尽量保持命令行为可复现、输出语义清晰、文档与 CLI help 一致。
+感谢 Agent 改进 InspireSkill。这个仓库的命令和手册要适合 Agent 阅读与执行，因此每个变更都要尽量保持命令行为可复现、输出语义清晰、文档与 CLI help 一致。
+
+`CODE_OF_CONDUCT.md` 通常表示社区行为准则，不适合承载开发规范；本仓库的贡献流程、开发原则和交付要求统一维护在本文档中。
+
+## 项目定位
+
+InspireSkill 的核心价值是让本地 CLI、Agent 手册和启智平台真实行为保持零漂移。它不是一份静态命令说明，也不是平台接口的薄包装；它要把平台调度、资源、镜像、路径、日志、事件和指标转化成可复现、可执行、适合 Agent 使用的工作流。
+
+同一份文档只服务 Agent。适合快速判断的表达，也应该适合稳定执行；不要按操作者身份维护两套互相分叉的原则。
 
 ## 开发环境
 
@@ -24,6 +32,54 @@ uv run pre-commit install --config ../.pre-commit-config.yaml
 uv run pre-commit run --config ../.pre-commit-config.yaml --all-files
 ```
 
+## 事实来源
+
+命令表面以 CLI help 为准。新增、删除或修改命令时，`inspire --help`、`inspire <command-group> --help` 和 `inspire <command-group> <subcommand> --help` 必须反映真实 Agent 入口；日常文档不要重新维护完整命令表。
+
+平台事实以 live 查询为准。`list`、`status`、`events`、`metrics`、资源规格、资源可用量、项目和账号视图不能依赖本地缓存、旧截图、旧文档或历史推测。缓存只用于 Web session / auth、连接复用、日志传输等性能场景，不能作为 Agent 可见事实来源。
+
+Browser API / OpenAPI 文档只收录已经闭合的合同。没有验证请求体、响应形状、Referer、权限边界和 destructive 语义的端点，留在抓包输出或任务记录里，不写进正式 reference。
+
+## Agent 合同
+
+普通 CLI 输入输出坚持 Name-only。Agent 应该使用名称、alias、可读状态和短表格理解对象；平台 handle 只能停留在 resolver、API payload、debug 日志和专门的 `id` 查询命令里。
+
+默认文本输出面向 Agent，要求短、清楚、能操作。脚本接口使用 `--json`，但 `--json` 也不应默认泄露低价值平台 handle。错误、hint 和歧义列表不要把 raw ID 当作解决方案暴露给 Agent。
+
+中文输出和文档要照顾宽度、标点和中英混排。表格需要中文宽度 aware；中文与 English / 数字 / 命令名相邻时保留半角空格；中文标点使用全角。
+
+## 配置和默认值
+
+不要把调度条件做成隐式默认值。`workspace`、`project`、`group`、`quota` 和 `image` 是创建 workload 的调度条件，只能来自显式参数、workload profile 或 batch 条目里的 `profile`。Profile 是调度条件组 alias，不是路径 alias。
+
+Path alias 只表示远端路径。`me`、`public`、`global-me` 和存储池前缀 alias 用于 `--cwd`、`scp`、日志路径和共享盘约定，不能替代 `workspace`、`project`、`group`、`quota` 或 `image`。
+
+账号、代理和本地环境通过账号配置呈现，不通过一次性环境变量前缀污染 live 命令示例。需要临时远端目录时用命令参数，例如 `--cwd /tmp`；需要持久语义时用 `inspire init`、`.inspire/config.toml` 和 `[path_aliases]`。
+
+## 平台工作流
+
+公网和 SII 内部源分开判断。公网下载、外部 Git、Hugging Face 权重和外部数据源通常放在 `CPU资源空间` 的可上网 notebook；PIP、Apt、Conda、npm、Maven、Docker Harbor、OSS、DNS 和 NTP 等内部源优先在目标 notebook 中按实际可达性配置，`分布式训练空间` 等 GPU 空间也可以直接跑通依赖。
+
+运行环境跑通后要保存成镜像。`image save` 会触发一段中等时长的镜像保存过程，过程中不可操作该 notebook；保存完毕后 notebook 不会被自动停止，仍可继续连接和使用。保存出的镜像才是后续 notebook / job / HPC / Ray / serving 应复用的稳定环境。
+
+观察优先用平台事件、指标和实例视图。失败先看 `events`，程序输出看 `logs`，资源是否真的工作看 `metrics`，实际运行单元看 `instances`。需要进入容器看瞬时状态时用 `exec` 或 `shell`，不要为一个观察问题保留旁路命令。
+
+## 文档边界
+
+文档只保留能帮助执行的内容。没用的入口不要在文档里声明“没用”；如果确实需要告诉 Agent 某个命令已删除、已迁移或不再推荐，这类边界应优先固化在 CLI help、测试和 release notes 里。
+
+使用手册和开发者参考分开。`SKILL.md` 和 `references/` 的日常手册只讲黑盒用法、平台语义和工作流；`references/dev/` 只在维护 CLI 封装、排查接口合同或 Agent 明确要求看接口时加载。
+
+上下文要节制。不要把内部源说明网址、历史兼容故事、旧命令列表、无关接口细节或“为了说明它没用而提到它”的内容放进 Agent 文档。重要的是已经整理过的结论和可执行步骤。
+
+## 代码维护
+
+优先沿用仓库已有模式。新增抽象必须降低真实复杂度、减少实际重复或匹配现有边界；不要为了局部方便引入新的风格、新依赖或平行体系。
+
+保持变更范围小而完整。改命令行为时同步更新 resolver、formatter、help、tests 和文档；改平台 API wrapper 时同步更新测试、开发参考和已知端点记录。不要做无关格式化或跨模块清理。
+
+对 destructive 操作保持证据闭环。创建、停止、删除、保存、发布等操作必须有受控 live smoke、前端 bundle payload 或等价证据支撑；live smoke 创建的对象必须清理，并在结果里说明残留风险。
+
 ## 提交前检查
 
 常规变更至少运行：
@@ -31,20 +87,20 @@ uv run pre-commit run --config ../.pre-commit-config.yaml --all-files
 ```bash
 cd cli
 uv run pytest -q
-uv run ruff check inspire tests --select E9,F63,F7,F82
+uv run ruff check inspire tests
 uv run mypy
 uv build
 ```
 
-当前 Ruff 在 CI 中只启用关键错误 baseline，mypy 以非阻断 baseline 运行，避免历史风格债或类型债阻断所有 PR。不要在无关 PR 中引入全仓格式化；如果要扩大 lint 或 typing 覆盖，请单独提交并说明迁移范围。
+窄文档变更至少做搜索验证和 `git diff --check`；命令 help 变更跑对应 help / formatter 测试；CLI 行为变更跑目标测试、Ruff、mypy 和必要的集成 smoke；共享行为或 release 前跑全量。
 
-## 变更要求
+当前 CI 会运行单元测试、Ruff、mypy 和构建验证。不要在无关 PR 中引入全仓格式化；如果要扩大 lint 或 typing 覆盖，请单独提交并说明迁移范围。
 
-- 不要修改与任务无关的 CLI runtime 代码。
-- 不要提交本地账号、代理、日志、缓存、构建产物或临时文件。
-- 默认文本输出应保持可读、可执行，不暴露低价值 raw ID；脚本接口使用 `--json`。
-- 新增或修改命令行为时，同步更新测试，并以 `inspire --help`、`inspire <command-group> --help` 或更具体 help 作为命令表面的事实来源。
-- 中文文档使用全角中文标点；中文与英文、数字、公式相邻时保留半角空格。
+## 交付要求
+
+CI 是交付信号。推送后看 GitHub Actions 的红叉 / 绿勾；失败就读日志、修原因、继续迭代，直到 required checks 通过，或剩余问题明确属于外部平台 / 权限 / 资源状态并已说明。
+
+交付要端到端。正常维护任务不止改代码：需要同步测试、文档、生成资产、版本号、release notes、部署或 PR 状态时一并处理。工作区保持干净，不留下 scratch 文件、日志、缓存、备份副本或半成品分支。
 
 ## Pull Request
 
@@ -54,4 +110,8 @@ PR 描述应包含：
 - 已运行的验证命令及结果。
 - 是否涉及 live Inspire 平台资源；如果涉及，说明创建对象、清理状态和残留风险。
 
-CI 会运行单元测试、Ruff 关键错误检查、非阻断 mypy baseline 和构建验证。后续收紧 mypy 时，应单独说明迁移范围。
+普通贡献可以走小而清楚的 PR；大范围语义调整先用 Issue 收敛问题场景和证据。维护者处理明确任务时，可以直接完成本地编辑、验证、提交、推送、PR、release 或部署，但如果任务要求先审阅草案，就不要提前提交或推送。
+
+版本发布按真实范围写 release notes，不能只复述 squash commit 标题。Breaking release 要覆盖 CLI 行为、配置边界、Web API、文档和测试的实际影响。
+
+复杂任务可以拆给多个 Agent 并行，但每个 Agent 要有清晰的问题边界或文件所有权，避免重复调查和写入冲突。主线程负责整合结果、验证行为和清理工作区。

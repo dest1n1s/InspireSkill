@@ -6,6 +6,15 @@
 
 当前无未发布变更。
 
+## 5.1.3（2026-05-11）
+
+### Changed
+
+- 清扫 Agent 手册和 references 的上下文污染：移除内部源说明网址残留、旧 project 元数据提示，以及“为了说明没用而提到没用入口”的文档内容。
+- Clarify internal mirror usage and `image save` workflow: 内部源可以优先在目标 notebook 中按实际可达性配置，依赖跑通后仍应保存镜像；保存过程中 notebook 暂不可操作，保存完毕后不会自动停止。
+- 统一本地文档和记忆里的操作者叫法：泛指操作者、读者、命令消费者和维护执行者时统一写 `Agent`；平台登录实体、权限主体和 API 字段按技术语义写“账号”、`user_id`、`username`、`/user/detail` 等。
+- 将开发原则维护进 `CONTRIBUTING.md`，覆盖事实来源、Name-only 合同、配置边界、平台 workflow、文档边界、验证和交付要求。
+
 ## 4.1.4（2026-05-09）
 
 ### Changed

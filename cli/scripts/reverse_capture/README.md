@@ -2,7 +2,7 @@
 
 `qz.sii.edu.cn` Browser API（`/api/v1/*`）没有公开合约，平台会静默改字段 / 改路径。
 这个目录里的工具是**用来重新测一遍现状**的：Playwright 跑一个无头 Chromium，
-模拟用户点一圈前端，把每条 `/api/v1/*` 请求/响应吐成 JSONL，然后和 `known_endpoints.py`
+模拟 Agent 点一圈前端，把每条 `/api/v1/*` 请求/响应吐成 JSONL，然后和 `known_endpoints.py`
 里的清单做 diff。`known_endpoints.py` 只登记已经闭合并写入
 `references/dev/browser-api.md` 的端点；NEW 端点必须先补齐请求体、响应、Referer 和 destructive 语义证据，再进入清单或 CLI。
 
@@ -89,7 +89,7 @@ uv run python scripts/reverse_capture/analyze.py /tmp/bapi.jsonl
 uv run python scripts/reverse_capture/analyze.py /tmp/bapi.jsonl /tmp/bapi-gpu.jsonl
 ```
 
-输出会告诉你：
+输出会给出：
 - **NEW 端点**：这些当前 known set 里没有。先用 DevTools、bundle 或 live smoke 补齐 body、响应、Referer 和 destructive 语义，再决定是否新增 wrapper；只有进入
   `references/dev/browser-api.md` 后，才同步加到 `known_endpoints.py`。
 - **KNOWN now 404**：这是退役信号；往 `STALE_SINCE_2026_04` 里挪，并在 CLI 里改走

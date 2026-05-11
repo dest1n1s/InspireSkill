@@ -106,10 +106,10 @@ Apt 的黑盒用法是改 `/etc/apt/sources.list`、`sudo apt-get update`、再 
 
 | 作用域 | 路径样例 | 定位 |
 | --- | --- | --- |
-| 项目个人 | `/inspire/<tier>/project/<topic>/<user>/...` | 每项目、每用户一份。适合代码、脚本、配置、调试输出 |
+| 项目个人 | `/inspire/<tier>/project/<topic>/<user>/...` | 每项目、每账号一份。适合代码、脚本、配置、调试输出 |
 | 项目公共 | `/inspire/<tier>/project/<topic>/public/...` | 项目成员共享。适合数据集、权重、批量结果、checkpoint |
 | 全局个人 | `/inspire/<tier>/global_user/<user>/...` | 跨项目个人盘。适合脚本、配置、小工具和跨项目小文件中转 |
-| 全局公共 | `/inspire/hdd/global_public/...` | 全平台共享，普通用户只读，稳定共享物由维护者统一放置 |
+| 全局公共 | `/inspire/hdd/global_public/...` | 全平台共享，普通账号只读，稳定共享物由维护者统一放置 |
 
 ## 7. 存储池
 
@@ -142,9 +142,9 @@ inspire notebook path list
 
 | Alias | 指向 |
 | --- | --- |
-| `me` | 当前项目、当前用户、初始化时选择的默认存储池 |
+| `me` | 当前项目、当前账号、初始化时选择的默认存储池 |
 | `public` | 当前项目公共目录、初始化时选择的默认存储池 |
-| `global-me` | 当前用户全局目录 |
+| `global-me` | 当前账号全局目录 |
 | `<tier>.me` | 指定存储池下的项目个人目录，例如 `ssd.me`、`hdd.me`、`qb-ilm2.me` |
 | `<tier>.public` | 指定存储池下的项目公共目录 |
 | `<tier>.global-me` | 指定存储池下的全局个人目录 |

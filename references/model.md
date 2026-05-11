@@ -13,7 +13,7 @@ inspire model <subcommand> --help
 
 `inspire model` 是启智平台模型仓库入口。
 
-- `list/status/versions` 是只读观察命令，默认只查当前用户的模型，并支持按 workspace、project 和 keyword 收窄。
+- `list/status/versions` 是只读观察命令，默认只查当前账号的模型，并支持按 workspace、project 和 keyword 收窄。
 - `register` 把平台可见目录注册成模型首版本；它不上传本地文件，也不修改已有模型。
 - 删除、改元数据、追加版本和发布到模型广场仍以平台页面为准。
 
@@ -54,4 +54,4 @@ inspire model register --name <model-name> --source-path <REMOTE_PATH> --workspa
 
 - `model register` 只注册平台侧已经可访问的目录；本地上传、追加版本、删除和发布不在 CLI 覆盖内。
 - model registry 与 model deployment 是两个不同的平台模块；前者是仓库浏览，后者是服务生命周期管理。
-- 日常默认看 human 输出；只有脚本消费字段或需要精确结构时才用 `--json`。
+- 日常默认看 Agent 可读输出；只有脚本消费字段或需要精确结构时才用 `--json`。

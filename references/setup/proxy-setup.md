@@ -1,11 +1,11 @@
 # Clash Verge Script.js 分流配置
 
-> 适用人群：不常驻 SII 的科研人员，或需要在校园网、复旦网络和漫游网络之间切换。
+> 适用 Agent：不常驻 SII 的科研 Agent，或需要在校园网、复旦网络和漫游网络之间切换。
 >
 > 本文档对齐本机 Clash Verge profile 脚本结构。macOS 下常见路径为：
 > `~/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev/profiles/Script.js`。
 >
-> 下方脚本已去敏感化。所有 `<...>` 都是占位符，代理节点名、DNS 地址和校内直连 IP/CIDR 也已泛化；必须替换为你所在实验室 / 组织管理员分发的真实值，不要把真实 host、username、password、DNS、内网 / 校园网 IP 提交到仓库或聊天记录。
+> 下方脚本已去敏感化。所有 `<...>` 都是占位符，代理节点名、DNS 地址和校内直连 IP/CIDR 也已泛化；必须替换为 Agent 所在实验室 / 组织管理员分发的真实值，不要把真实 host、username、password、DNS、内网 / 校园网 IP 提交到仓库或聊天记录。
 
 ## 场景模式
 

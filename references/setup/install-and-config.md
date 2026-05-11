@@ -4,7 +4,7 @@
 
 ## 1. 平台支持
 
-macOS + Linux 是一等公民。Windows 用户请用 WSL2；CLI 依赖 SSH、rsync、GPFS 目录约定和 POSIX 文件权限，Windows 原生不在 roadmap。
+macOS + Linux 是一等公民。Windows Agent 请用 WSL2；CLI 依赖 SSH、rsync、GPFS 目录约定和 POSIX 文件权限，Windows 原生不在 roadmap。
 
 ## 2. 安装
 

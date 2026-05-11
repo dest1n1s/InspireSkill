@@ -60,7 +60,7 @@ inspire image save <notebook-name> -n <img-name> -v v1 --public --wait
 
 ### Push 工作流
 
-平台为你创建一个镜像槽并返回 registry URL，你把镜像推上去：
+平台创建一个镜像槽并返回 registry URL，Agent 把镜像推上去：
 
 ```bash
 inspire image register -n my-img -v v1.0
