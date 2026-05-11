@@ -8,12 +8,12 @@ Notebook 是交互工作台，不只是“开一个终端”。常见角色：
 
 | 角色 | 用法 |
 | --- | --- |
-| 联网准备盒 | 在可上网 CPU 组下载代码、依赖、数据和权重，写入共享盘或保存镜像 |
+| 联网 / 内部源准备盒 | 公网下载放在可上网 CPU 组；内部源依赖可在目标 GPU 组直接配置验证，写入共享盘或保存镜像 |
 | 训练调试盒 | 在目标 GPU 组做小规模 probe、查看 GPU / CUDA / NCCL / 数据路径 |
 | 远端文件入口 | 用 `exec` / `shell` / `scp` 管理共享盘文件 |
 | 临时服务盒 | 启动 Gradio、FastAPI、OpenAI-compatible API，再通过 notebook proxy 访问 |
 
-`分布式训练空间` 不可上网时，不要把 `git clone`、外部权重下载或访问公网数据源放到目标 GPU notebook / job 里。先在 `CPU资源空间` 的可上网 CPU notebook 中准备，再把结果留在 `me` / `public` 等共享路径，或保存为镜像。安装 Python / Apt / Conda / npm / Maven 包、访问内部 Docker Harbor 或 OSS 时先看 SII 内部源；它和公网不同，在不可上网 compute group 里也可能可用。
+`分布式训练空间` 不可上网时，不要把 `git clone`、外部权重下载或访问公网数据源放到目标 GPU notebook / job 里。先在 `CPU资源空间` 的可上网 CPU notebook 中准备，再把结果留在 `me` / `public` 等共享路径，或保存为镜像。安装 Python / Apt / Conda / npm / Maven 包、访问内部 Docker Harbor 或 OSS 时优先看 SII 内部源；它和公网不同，在不可上网 compute group 里也可能可用，因此可以在目标 GPU notebook 中按实际可达性直接配置并跑通任务。
 
 日常 workspace 心智模型很简单：`CPU资源空间` 负责 CPU notebook 和联网准备，`分布式训练空间` 负责 GPU notebook 和训练调试。国产卡分区、`CI-情境智能` 工作空间或其它小组专属空间属于特殊硬件 / 特殊项目路径，只有任务明确要求时才切换。
 
@@ -103,7 +103,7 @@ inspire notebook scp <notebook-name> --download me:<repo>/outputs/ ./outputs/ -r
 
 ## 6. 基底环境与镜像
 
-项目刚开始时，建议在 `CPU资源空间` 用统一基底镜像起一个基底 notebook，把 Slurm、Ray、分布式训练依赖和项目依赖一次性装好。验证通过后保存成项目镜像，后续 notebook、job、HPC、Ray 和 serving 复用该镜像。
+项目刚开始时，建议用统一基底镜像起一个基底 notebook，把 Slurm、Ray、分布式训练依赖和项目依赖一次性装好。公网下载放在 `CPU资源空间` 的可上网 notebook；只依赖 SII 内部源时，可以直接在 `分布式训练空间` 等目标 GPU notebook 中配置镜像源并验证。验证通过后保存成项目镜像，后续 notebook、job、HPC、Ray 和 serving 复用该镜像。
 
 ```bash
 inspire notebook create --workspace CPU资源空间 --group CPU资源-2 -q 0,20,256 \
@@ -117,6 +117,8 @@ inspire notebook exec base-box --cwd me:<repo> \
 inspire notebook install-deps base-box --slurm --ray
 inspire image save base-box -n <IMAGE_NAME> -v v1 --public --wait
 ```
+
+`image save` 会触发一段中等时长的镜像保存过程；保存过程中不可操作该 notebook；保存完毕后 notebook 不会被自动停止，仍可继续连接和使用。保存出的镜像才是后续 workload 应复用的稳定环境。
 
 已有 Ubuntu 镜像需要补 Slurm / Ray 依赖时：
 

@@ -31,7 +31,9 @@ def image():
     preparing a notebook environment, `image register` for images built
     outside the platform, `set-visibility` to share or privatize a custom
     image, and `delete` only after confirming no active workload depends on
-    that image.
+    that image. `image save` starts a medium-length saving process; the
+    notebook cannot be operated while saving is in progress, is not stopped
+    after saving completes, and can then be used again.
 
     \b
     Examples:

@@ -11,7 +11,7 @@ inspire image <subcommand> --help
 
 ## 1. 镜像在工作流中的位置
 
-镜像是把“已经装好的运行环境”从 `CPU资源空间` 的准备盒带到 `分布式训练空间` 或其它 compute group 的方式。`分布式训练空间` 不可上网时，常见做法是在 `CPU资源空间` 的可上网 CPU notebook 里安装依赖和运行 smoke test，然后 `image save` 成项目镜像，再用于 GPU notebook、job、HPC、Ray 或 serving。只缺平台内包时先看 SII 内部源；它可能在无公网 group 里直接可用。
+镜像是把“已经装好的运行环境”固化下来，并在 notebook、job、HPC、Ray 或 serving 间复用的方式。公网下载放在 `CPU资源空间` 的可上网 CPU notebook；只缺平台内包、内部 Docker 镜像或对象存储访问时，优先在目标 notebook 里配置 SII 内部源，`分布式训练空间` 等 GPU 空间也可能直接跑通。环境验证通过后再 `image save` 成项目镜像，后续 workload 复用该稳定环境。
 
 镜像不负责保存数据集、权重和 checkpoint；这些应放在共享盘路径里，用 path alias 管理。
 
@@ -51,6 +51,7 @@ inspire image save <notebook-name> -n <img-name> -v v1 --public --wait
 - `NOTEBOOK` 是 notebook 名称。
 - 用 `--wait` 等到镜像进入 `READY`，否则后续任务可能拉不到镜像。
 - `--public` / `--private` 控制平台可见性；敏感依赖、内部数据或个人实验镜像默认保持私有。
+- `image save` 会触发一段中等时长的镜像保存过程；保存过程中不可操作该 notebook；保存完毕后 notebook 不会被自动停止，仍可继续连接和使用。
 - 固化后再用 `image list` 或 `image detail` 确认名称、版本和状态。
 
 ## 5. 注册外部镜像：`image register`

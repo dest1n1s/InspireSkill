@@ -11,7 +11,7 @@
 | 弹性 worker / 长守护 / 流式处理 | `inspire ray` | 需要 Ray driver、head、弹性 worker group |
 | 模型 HTTP 部署 | `inspire serving` | 从已注册模型创建在线服务 |
 
-日常 workspace 选择直接按用途走：CPU / HPC / 联网准备用 `CPU资源空间`，GPU 训练 / GPU notebook / serving 用 `分布式训练空间`。目标 `分布式训练空间` 不可上网时，先在 `CPU资源空间` 的可上网 CPU notebook 准备共享盘内容或镜像，再提交目标 workload。不要把公网下载和拉 Git 放进离线训练 job 的启动命令里；临时安装包时先判断 SII 内部源是否可用。
+日常 workspace 选择直接按用途走：CPU / HPC / 公网准备用 `CPU资源空间`，GPU 训练 / GPU notebook / serving 用 `分布式训练空间`。目标 `分布式训练空间` 不可上网时，先在 `CPU资源空间` 的可上网 CPU notebook 准备公网内容；只缺平台内部源覆盖的包、镜像或对象存储时，可以先在目标 GPU notebook 里配置 SII 内部源并验证。不要把公网下载和拉 Git 放进离线训练 job 的启动命令里；跑通的运行环境要保存成镜像再提交目标 workload。
 
 ## 2. 通用提交流程
 

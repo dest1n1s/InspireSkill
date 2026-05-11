@@ -450,6 +450,12 @@ def save_image_cmd(
     """Save a running notebook as a custom Docker image.
 
     NOTEBOOK is the notebook name (from `inspire notebook list`).
+    Use this after configuring and validating a notebook environment, including
+    SII internal mirrors when they are reachable from the target GPU area.
+    `image save` starts a medium-length image-saving process. While it is
+    running, the notebook cannot be operated. Saving an image does not stop or
+    delete the notebook; after saving completes, the notebook remains available
+    for normal use.
 
     \b
     Examples:
@@ -574,6 +580,11 @@ def save_image_cmd(
         return
 
     click.echo(f"Notebook saved as image: {image_label}")
+    click.echo(
+        "Note: image save starts a medium-length saving process. The notebook "
+        "cannot be operated while saving is in progress; after saving completes, "
+        "the notebook is not stopped and can be used again."
+    )
     if requested_visibility and image_id:
         label = "public" if requested_visibility == _VISIBILITY_PUBLIC else "private"
         click.echo(f"Visibility: {label}")
