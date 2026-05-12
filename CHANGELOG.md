@@ -6,6 +6,21 @@
 
 当前无未发布变更。
 
+## 5.1.4（2026-05-12）
+
+### Changed
+
+- 统一 CLI 查询命令边界：删除历史分页暴露，统一使用 `--limit/-n`；`resources specs` 收敛为各 workload 的 `quota` 命令；查询类 `--group` 明确支持 keyword / substring，操作类 `--group` 继续要求完整 compute group 名称。
+- 统一 CLI 操作命令边界：操作命令只接受单一明确 workspace，不再接受 `all`、`current` 或 raw workspace ID；删除 command-local `--json`，统一使用全局 `inspire --json ...`；删除类命令统一为 `--yes/-y`。
+- 收紧 workload create / batch 参数：`--profile` 与显式调度条件互斥，batch defaults 与 item 合并后同样校验；Ray create 删除 `--head-*`，统一使用普通 head 条件参数，并严格校验 repeatable `--worker` schema。
+- 收紧边角命令参数：`notebook shell` 和 `notebook ssh test` 不再依赖隐式缓存目标；`image save` 必须显式传 `--workspace`；`image` 可见性统一为 `--visibility private|public`；`init --global/--project` 改为 `--scope project|global`。
+- 将 quota 从 `resources` 命名空间拆出到 `notebook quota`、`job quota`、`hpc quota`、`ray quota` 和 `serving quota`，避免把配额语义混进资源节点查询。
+
+### Fixed
+
+- 测试套件全局禁用 CLI 启动阶段的后台 update check，避免 CI 中反复调用 CLI 时派生大量孤儿 Python 进程并拖挂 Python 3.12 作业。
+- CI 恢复普通 `uv run pytest -q` 执行路径，并保留 job 级超时保护。
+
 ## 5.1.3（2026-05-11）
 
 ### Changed
