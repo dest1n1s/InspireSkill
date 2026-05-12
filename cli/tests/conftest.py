@@ -12,6 +12,12 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
+def _disable_update_check(monkeypatch):  # noqa: ANN001
+    """Tests should not spawn detached update-check subprocesses."""
+    monkeypatch.setenv("INSPIRE_SKIP_UPDATE_CHECK", "1")
+
+
+@pytest.fixture(autouse=True)
 def _silence_normalize_environment(monkeypatch):  # noqa: ANN001
     """Stub `normalize_environment` to a no-op for the whole suite.
 
