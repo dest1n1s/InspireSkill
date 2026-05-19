@@ -1169,7 +1169,13 @@ def _probe_terminal_command_markers_via_ws(
 
     try:
         ws_url = _build_terminal_websocket_url(lab_frame.url, term_name)
-        stdin_data = command if command.endswith("\r") else f"{command}\r"
+        # Jupyter terminals echo stdin before command output.  Marker probes often
+        # include both success and failure markers in shell branches, so sending
+        # the raw command can make the echoed command look like a real marker.
+        # Ship the probe body through a base64 wrapper; terminal echo then
+        # contains only the encoded payload while stdout still carries markers.
+        probe_command = _build_batch_setup_script([command.rstrip("\r\n")])
+        stdin_data = f"{probe_command}\r"
         try:
             result = lab_frame.evaluate(
                 """

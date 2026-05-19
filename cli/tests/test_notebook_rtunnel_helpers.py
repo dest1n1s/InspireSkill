@@ -24,6 +24,7 @@ from inspire.platform.web.browser_api.rtunnel import (
     _focus_terminal_input,
     _jupyter_server_base,
     _open_or_create_terminal,
+    _probe_terminal_command_markers_via_ws,
     _send_setup_command_via_terminal_ws,
     _send_terminal_command_via_websocket,
     _verify_terminal_focus,
@@ -323,6 +324,56 @@ def test_send_terminal_command_via_websocket_playwright_exception() -> None:
         command="echo hi",
     )
     assert result is False
+
+
+def test_probe_terminal_command_markers_encodes_stdin_to_avoid_echo_false_positive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class _LabFrame:
+        url = "https://nb.example.com/lab"
+
+        def evaluate(self, script: str, payload: dict):  # noqa: ANN201
+            captured["script"] = script
+            captured["payload"] = payload
+            return "__INSPIRE_OPENSSH_OK__"
+
+    monkeypatch.setattr(rtunnel_module, "_create_terminal_via_api", lambda *_a, **_k: "1")
+    monkeypatch.setattr(
+        rtunnel_module,
+        "_build_terminal_websocket_url",
+        lambda _url, _term: "wss://nb.example.com/terminals/websocket/1",
+    )
+    deleted: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        rtunnel_module,
+        "_delete_terminal_via_api",
+        lambda _context, *, lab_url, term_name: deleted.append((lab_url, term_name)) or True,
+    )
+
+    command = (
+        f'[ -f "{OPENSSH_INSTALL_FAILED_FILE}" ] '
+        "&& echo __INSPIRE_OPENSSH_FAILED__ || echo __INSPIRE_OPENSSH_OK__"
+    )
+    result = _probe_terminal_command_markers_via_ws(
+        context=object(),
+        lab_frame=_LabFrame(),
+        command=command,
+        markers={"__INSPIRE_OPENSSH_FAILED__": True, "__INSPIRE_OPENSSH_OK__": False},
+    )
+
+    assert result is False
+    payload = captured["payload"]
+    assert payload["wsUrl"] == "wss://nb.example.com/terminals/websocket/1"
+    stdin_data = str(payload["stdinData"])
+    assert "__INSPIRE_OPENSSH_FAILED__" not in stdin_data
+    assert "__INSPIRE_OPENSSH_OK__" not in stdin_data
+    assert stdin_data.startswith("echo '")
+    assert stdin_data.endswith("' | base64 -d | bash\r")
+    encoded = stdin_data[len("echo '") : -len("' | base64 -d | bash\r")]
+    assert base64.b64decode(encoded).decode() == f"{command}\n"
+    assert deleted == [("https://nb.example.com/lab", "1")]
 
 
 def test_send_setup_command_via_terminal_ws_cleans_up_terminal(

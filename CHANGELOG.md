@@ -6,6 +6,12 @@
 
 当前无未发布变更。
 
+## 5.1.17（2026-05-19）
+
+### Fixed
+
+- 修复 Notebook SSH bootstrap 的 Jupyter terminal marker probe 误判：探测 OpenSSH / rtunnel 状态时不再把包含成功和失败 marker 的原始命令直接写入终端，避免终端回显 `__INSPIRE_OPENSSH_FAILED__` 等字符串后被当作真实失败输出。现在 probe 命令会经 base64 包装后执行，只有脚本真实 stdout 会参与 marker 匹配。
+
 ## 5.1.16（2026-05-19）
 
 ### Fixed
