@@ -234,12 +234,21 @@ def _is_local_requirement(spec: str | None) -> bool:
     return " @ file://" in value
 
 
-def _official_uv_install_cmd() -> list[str]:
+_SAFE_VERSION_RE = re.compile(r"^[0-9][A-Za-z0-9.!+_-]*$")
+
+
+def _package_requirement(target_version: str | None = None) -> str:
+    if target_version and _SAFE_VERSION_RE.match(target_version):
+        return f"{PACKAGE_NAME}=={target_version}"
+    return PACKAGE_NAME
+
+
+def _official_uv_install_cmd(target_version: str | None = None) -> list[str]:
     # `uv tool upgrade` preserves the original install requirement. If the
     # tool was installed from a local path, that keeps updating from the local
     # checkout. For a global end-user update, force the canonical PyPI package
     # requirement so `inspire update` can repair local-path installs in one run.
-    return ["uv", "tool", "install", "--force", "--refresh", PACKAGE_NAME]
+    return ["uv", "tool", "install", "--force", "--refresh", _package_requirement(target_version)]
 
 
 def _is_likely_network_or_index_error(output: str) -> bool:
@@ -280,11 +289,11 @@ def _run_upgrade_command(
     return proc.returncode, output
 
 
-def _upgrade_cli(silent: bool) -> bool:
+def _upgrade_cli(silent: bool, target_version: str | None = None) -> bool:
     installer = _detect_installer()
     uv_info = None if silent and installer in {"uv", "pipx"} else _uv_tool_info()
     if installer == "uv":
-        cmd = _official_uv_install_cmd()
+        cmd = _official_uv_install_cmd(target_version)
         if uv_info and _is_local_requirement(uv_info.required) and not silent:
             click.secho(
                 f"! Existing uv tool install uses a local source ({uv_info.required}); "
@@ -295,7 +304,7 @@ def _upgrade_cli(silent: bool) -> bool:
     elif installer == "pipx":
         cmd = ["pipx", "upgrade", PACKAGE_NAME]
     elif uv_info is not None:
-        cmd = _official_uv_install_cmd()
+        cmd = _official_uv_install_cmd(target_version)
         if not silent:
             click.secho(
                 "› Current process is not the global uv tool install; "
@@ -945,7 +954,7 @@ def update(check_only: bool, silent: bool, cli_only: bool, skill_only: bool) -> 
 
     ok = True
     if not skill_only:
-        ok = _upgrade_cli(silent) and ok
+        ok = _upgrade_cli(silent, target_version=pre.get("latest")) and ok
     if not cli_only:
         ok = _refresh_skill_files(silent, latest_version=pre.get("latest")) and ok
 

@@ -160,10 +160,12 @@ Apt 的黑盒用法是改 `/etc/apt/sources.list`、`sudo apt-get update`、再 
 
 | 作用域 | 路径样例 | 定位 |
 | --- | --- | --- |
-| 项目个人 | `/inspire/<tier>/project/<topic>/<user>/...` | 每项目、每账号一份。适合代码、脚本、配置、调试输出 |
+| 项目个人 | `/inspire/<tier>/project/<topic>/<path-user>/...` | 每项目、每账号一份。适合代码、脚本、配置、调试输出 |
 | 项目公共 | `/inspire/<tier>/project/<topic>/public/...` | 项目成员共享。适合数据集、权重、批量结果、checkpoint |
-| 全局个人 | `/inspire/<tier>/global_user/<user>/...` | 跨项目个人盘。适合脚本、配置、小工具和跨项目小文件中转 |
+| 全局个人 | `/inspire/<tier>/global_user/<path-user>/...` | 跨项目个人盘。适合脚本、配置、小工具和跨项目小文件中转 |
 | 全局公共 | `/inspire/hdd/global_public/...` | 全平台共享，普通账号只读，稳定共享物由维护者统一放置 |
+
+`<path-user>` 是平台共享盘返回的个人目录名，不一定等于登录 ID。例如登录账号可以是数字工号，个人目录名可以是拼音加内部编号。
 
 ## 7. 存储池
 
@@ -180,7 +182,7 @@ Apt 的黑盒用法是改 `/etc/apt/sources.list`、`sudo apt-get update`、再 
 
 实例只挂自身所在项目的 fileset。其它项目的 `/inspire/{hdd,ssd,qb-ilm,qb-ilm2}/project/<others>/` 在该实例里通常不存在，`ls` 报 `No such file` 不是权限问题。
 
-跨项目搬小文件时，在两个项目各起一个 notebook，用 `/inspire/hdd/global_user/<user>/` 中转。大数据集或全量 checkpoint 超出个人 quota 时，联系项目管理员处理。
+跨项目搬小文件时，在两个项目各起一个 notebook，用 `/inspire/hdd/global_user/<path-user>/` 中转。大数据集或全量 checkpoint 超出个人 quota 时，联系项目管理员处理。
 
 ## 9. Path Alias 配置入口
 
@@ -214,7 +216,7 @@ inspire notebook scp <name> ./config.yaml me:<repo>/config.yaml
 需要给常用子目录命名时，通过项目级 path alias 命令记录：
 
 ```bash
-inspire notebook path set repo /inspire/ssd/project/<topic>/<user>/<repo>
+inspire notebook path set repo /inspire/ssd/project/<topic>/<path-user>/<repo>
 inspire notebook path list
 inspire notebook exec <name> --cwd repo "pytest -q"
 ```

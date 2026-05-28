@@ -1076,6 +1076,54 @@ class TestInitCommand:
         assert aliases["ssd.public"] == "/inspire/ssd/project/topic-a/public/"
         assert aliases["qb-ilm2.me"] == "/inspire/qb-ilm2/project/topic-a/alice/"
 
+    def test_discovered_path_aliases_use_platform_personal_directory(
+        self,
+    ) -> None:
+        from inspire.cli.commands.init.discover import (
+            _persist_default_path_aliases,
+            _populate_project_catalog,
+        )
+        from inspire.platform.web.browser_api.projects import ProjectInfo
+
+        project = ProjectInfo(
+            project_id="project-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            name="CI-情境智能-探索课题",
+            workspace_id="ws-11111111-1111-1111-1111-111111111111",
+        )
+        project_catalog: dict[str, dict[str, str]] = {}
+
+        class BrowserApi:
+            @staticmethod
+            def get_train_job_workdir(**_: object) -> str:
+                return "/inspire/hdd/project/exploration-topic/tongjingqi-CZXS25110029"
+
+        _populate_project_catalog(
+            project_catalog=project_catalog,
+            projects=[project],
+            browser_api_module=BrowserApi,
+            session=object(),
+            workspace_id=project.workspace_id,
+            account_key="253108120116",
+            force=True,
+        )
+        assert project_catalog[project.project_id]["path_user"] == "tongjingqi-CZXS25110029"
+        project_data: dict[str, object] = {}
+
+        _persist_default_path_aliases(
+            project_data=project_data,
+            account_key="253108120116",
+            selected_project=project,
+            project_catalog=project_catalog,
+            selected_tier="ssd",
+            force=True,
+        )
+
+        aliases = project_data["path_aliases"]
+        assert aliases["me"] == (
+            "/inspire/ssd/project/exploration-topic/tongjingqi-CZXS25110029/"
+        )
+        assert aliases["global-me"] == "/inspire/ssd/global_user/tongjingqi-CZXS25110029/"
+
     def _setup_discover_mocks(
         self,
         monkeypatch: pytest.MonkeyPatch,

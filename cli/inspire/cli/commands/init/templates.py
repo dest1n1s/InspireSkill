@@ -106,13 +106,15 @@ log_pattern = "training_master_*.log"
 
 [path_aliases]
 # Remote path aliases for notebook exec/shell/scp. Plain `inspire init`
-# fills these from /inspire/<tier>/project/<topic>/<user>/.
-# me = "/inspire/ssd/project/<topic>/<user>/"
+# fills these from /inspire/<tier>/project/<topic>/<path-user>/.
+# <path-user> is the shared-storage personal directory segment reported by
+# the platform, which can differ from the login username.
+# me = "/inspire/ssd/project/<topic>/<path-user>/"
 # public = "/inspire/ssd/project/<topic>/public/"
-# global-me = "/inspire/ssd/global_user/<user>/"
-# hdd.me = "/inspire/hdd/project/<topic>/<user>/"
+# global-me = "/inspire/ssd/global_user/<path-user>/"
+# hdd.me = "/inspire/hdd/project/<topic>/<path-user>/"
 # ssd.public = "/inspire/ssd/project/<topic>/public/"
-# qb-ilm2.me = "/inspire/qb-ilm2/project/<topic>/<user>/"
+# qb-ilm2.me = "/inspire/qb-ilm2/project/<topic>/<path-user>/"
 
 [github]
 repo = "owner/repo"

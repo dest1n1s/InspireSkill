@@ -759,12 +759,16 @@ def _populate_project_catalog(
     * ``name``  — the platform's display name (for reference; redundant with
       the ``[projects]`` key but useful if a project gets renamed).
     * ``path``  — the ``<topic>`` segment of the shared-storage path
-      (``/inspire/<tier>/project/<topic>/<user>/...``). Derived from the
+      (``/inspire/<tier>/project/<topic>/<path_user>/...``). Derived from the
       platform's reported train_job workdir; agents need it to construct
       remote paths for new repos under this project.
+    * ``path_user`` — the platform filesystem personal-directory segment. This
+      is not necessarily the login username, e.g. login ``253108120116`` may
+      map to ``tongjingqi-CZXS25110029`` on shared storage.
 
     Notably *not* stored: full ``workdir``. It is derivable from ``path`` +
-    the storage tier + the user, and caching it made the account config noisy.
+    the storage tier + ``path_user``, and caching it made the account config
+    noisy.
     """
     for project in projects:
         project_id = str(getattr(project, "project_id", "") or "").strip()
@@ -796,14 +800,24 @@ def _populate_project_catalog(
         if not workdir:
             continue
 
-        # Parse the <topic> segment: /inspire/<tier>/project/<topic>/...
-        parts = [p for p in workdir.split("/") if p]
-        try:
-            idx = parts.index("project")
-            if idx + 1 < len(parts):
-                entry["path"] = parts[idx + 1]
-        except ValueError:
-            pass
+        topic, path_user = _parse_project_workdir(workdir)
+        if topic:
+            entry["path"] = topic
+        if path_user:
+            entry["path_user"] = path_user
+
+
+def _parse_project_workdir(workdir: str) -> tuple[str | None, str | None]:
+    """Parse ``/inspire/<tier>/project/<topic>/<path_user>/...``."""
+    parts = [p for p in str(workdir or "").split("/") if p]
+    try:
+        idx = parts.index("project")
+    except ValueError:
+        return None, None
+
+    topic = parts[idx + 1] if idx + 1 < len(parts) else None
+    path_user = parts[idx + 2] if idx + 2 < len(parts) else None
+    return topic, path_user
 
 
 def _persist_api_base_url(
@@ -1068,8 +1082,9 @@ def _default_path_aliases(
     account_key: str,
     project_topic: str,
     selected_tier: str,
+    path_user: str | None = None,
 ) -> dict[str, str]:
-    user = str(account_key or "").strip().strip("/")
+    user = str(path_user or account_key or "").strip().strip("/")
     topic = str(project_topic or "").strip().strip("/")
     if not user or not topic:
         return {}
@@ -1105,6 +1120,7 @@ def _persist_default_path_aliases(
     project_id = str(getattr(selected_project, "project_id", "") or "").strip()
     entry = project_catalog.get(project_id, {})
     project_topic = str(entry.get("path") or "").strip()
+    path_user = str(entry.get("path_user") or "").strip()
     if not project_topic:
         return
 
@@ -1112,6 +1128,7 @@ def _persist_default_path_aliases(
         account_key=account_key,
         project_topic=project_topic,
         selected_tier=selected_tier,
+        path_user=path_user,
     )
     if not defaults:
         return
@@ -1473,7 +1490,7 @@ def _persist_discovery_catalog(request: _DiscoveryPersistRequest) -> None:
                 catalog.pop(project_id, None)
                 continue
             for key in list(entry.keys()):
-                if key not in {"name", "path"}:
+                if key not in {"name", "path", "path_user"}:
                     entry.pop(key, None)
             if not entry:
                 catalog.pop(project_id, None)

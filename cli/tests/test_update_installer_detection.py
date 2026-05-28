@@ -108,6 +108,24 @@ def test_upgrade_cli_retries_pypi_network_errors_with_mirrors(
     ]
 
 
+def test_upgrade_cli_pins_known_target_version_for_uv(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(cmd, check, env, text, stdout, stderr):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout="installed\n", stderr="")
+
+    monkeypatch.setattr(sys, "prefix", "/Users/vagrant/.local/share/uv/tools/inspire-skill")
+    monkeypatch.setattr(update_module.subprocess, "run", fake_run)
+
+    assert _upgrade_cli(silent=True, target_version="5.1.21") is True
+    assert calls == [
+        ["uv", "tool", "install", "--force", "--refresh", "inspire-skill==5.1.21"]
+    ]
+
+
 def test_upgrade_cli_does_not_retry_non_network_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -239,7 +257,11 @@ def test_update_runs_global_runtime_setup_after_cli_upgrade(
     calls: list[str] = []
     monkeypatch.setattr(update_module, "run_check", lambda **_kwargs: {"latest": "4.1.1"})
     monkeypatch.setattr(update_module, "_print_status", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(update_module, "_upgrade_cli", lambda silent: calls.append("cli") or True)
+    monkeypatch.setattr(
+        update_module,
+        "_upgrade_cli",
+        lambda silent, target_version=None: calls.append(f"cli:{target_version}") or True,
+    )
     monkeypatch.setattr(
         update_module,
         "_refresh_skill_files",
@@ -267,7 +289,7 @@ def test_update_runs_global_runtime_setup_after_cli_upgrade(
         skill_only=False,
     )
 
-    assert calls == ["cli", "skills", "audit", "runtime", "normalize"]
+    assert calls == ["cli:4.1.1", "skills", "audit", "runtime", "normalize"]
 
 
 def test_parse_uv_tool_list_captures_local_source_and_executable() -> None:
