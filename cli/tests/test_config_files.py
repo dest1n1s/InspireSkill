@@ -1060,21 +1060,41 @@ class TestInitCommand:
         # Global config should NOT exist (no global-scope vars)
         assert not global_config.exists()
 
-    def test_default_path_aliases_use_selected_tier_project_topic_and_user(self) -> None:
+    def test_default_path_aliases_use_platform_path_user(self) -> None:
         from inspire.cli.commands.init.discover import _default_path_aliases
 
         aliases = _default_path_aliases(
-            account_key="alice",
+            account_key="253108120116",
             project_topic="topic-a",
             selected_tier="ssd",
+            path_user="tongjingqi-CZXS25110029",
         )
 
-        assert aliases["me"] == "/inspire/ssd/project/topic-a/alice/"
+        assert aliases["me"] == "/inspire/ssd/project/topic-a/tongjingqi-CZXS25110029/"
         assert aliases["public"] == "/inspire/ssd/project/topic-a/public/"
-        assert aliases["global-me"] == "/inspire/ssd/global_user/alice/"
-        assert aliases["hdd.me"] == "/inspire/hdd/project/topic-a/alice/"
+        assert aliases["global-me"] == "/inspire/ssd/global_user/tongjingqi-CZXS25110029/"
+        assert aliases["hdd.me"] == "/inspire/hdd/project/topic-a/tongjingqi-CZXS25110029/"
         assert aliases["ssd.public"] == "/inspire/ssd/project/topic-a/public/"
-        assert aliases["qb-ilm2.me"] == "/inspire/qb-ilm2/project/topic-a/alice/"
+        assert aliases["qb-ilm2.me"] == (
+            "/inspire/qb-ilm2/project/topic-a/tongjingqi-CZXS25110029/"
+        )
+
+    def test_default_path_aliases_do_not_fallback_to_account_key(self) -> None:
+        from inspire.cli.commands.init.discover import _default_path_aliases
+
+        aliases = _default_path_aliases(
+            account_key="253108120116",
+            project_topic="topic-a",
+            selected_tier="ssd",
+            path_user=None,
+        )
+
+        assert aliases["public"] == "/inspire/ssd/project/topic-a/public/"
+        assert aliases["hdd.public"] == "/inspire/hdd/project/topic-a/public/"
+        assert "me" not in aliases
+        assert "global-me" not in aliases
+        assert "hdd.me" not in aliases
+        assert "hdd.global-me" not in aliases
 
     def test_discovered_path_aliases_use_platform_personal_directory(
         self,

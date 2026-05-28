@@ -1084,9 +1084,10 @@ def _default_path_aliases(
     selected_tier: str,
     path_user: str | None = None,
 ) -> dict[str, str]:
-    user = str(path_user or account_key or "").strip().strip("/")
+    _ = account_key  # Account identity is not a shared-storage path component.
+    user = str(path_user or "").strip().strip("/")
     topic = str(project_topic or "").strip().strip("/")
-    if not user or not topic:
+    if not topic:
         return {}
 
     tier_names = set(_STORAGE_TIER_NAMES)
@@ -1095,16 +1096,18 @@ def _default_path_aliases(
 
     aliases: dict[str, str] = {}
     for tier in _STORAGE_TIER_NAMES:
-        me = f"/inspire/{tier}/project/{topic}/{user}/"
         public = f"/inspire/{tier}/project/{topic}/public/"
-        global_me = f"/inspire/{tier}/global_user/{user}/"
-        aliases[f"{tier}.me"] = me
         aliases[f"{tier}.public"] = public
-        aliases[f"{tier}.global-me"] = global_me
+        if user:
+            me = f"/inspire/{tier}/project/{topic}/{user}/"
+            global_me = f"/inspire/{tier}/global_user/{user}/"
+            aliases[f"{tier}.me"] = me
+            aliases[f"{tier}.global-me"] = global_me
         if tier == selected_tier:
-            aliases["me"] = me
             aliases["public"] = public
-            aliases["global-me"] = global_me
+            if user:
+                aliases["me"] = me
+                aliases["global-me"] = global_me
     return aliases
 
 
