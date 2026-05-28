@@ -33,6 +33,7 @@ class ProjectInfo:
     project_id: str
     name: str
     workspace_id: str
+    en_name: str = ""
     # Quota fields
     budget: float = 0.0  # Total budget allocated
     remain_budget: float = 0.0  # Remaining budget
@@ -122,6 +123,7 @@ def list_projects(
             project_id=item.get("id", ""),
             name=item.get("name", ""),
             workspace_id=item.get("workspace_id", workspace_id),
+            en_name=item.get("en_name", ""),
             budget=_parse_float(item.get("budget")),
             remain_budget=_parse_float(item.get("remain_budget")),
             member_remain_budget=_parse_float(item.get("member_remain_budget")),

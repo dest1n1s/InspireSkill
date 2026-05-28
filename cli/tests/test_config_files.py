@@ -445,6 +445,23 @@ class TestAccountConfigLayer:
         assert cfg.username == "alice-wins"
         assert cfg.timeout == 99  # account layer, not legacy global
 
+    def test_account_project_catalog_preserves_path_user(
+        self, home: Path, clean_env: None
+    ) -> None:
+        self._write_account_config(
+            home,
+            "alice",
+            '[project_catalog."project-1"]\n'
+            'name = "CI-情境智能"\n'
+            'path = "embodied-multimodality"\n'
+            'path_user = "tongjingqi-CZXS25110029"\n',
+        )
+
+        cfg, sources = Config.from_files_and_env(require_credentials=False)
+
+        assert cfg.project_catalog["project-1"]["path_user"] == "tongjingqi-CZXS25110029"
+        assert sources["project_catalog"] == SOURCE_GLOBAL
+
     def test_project_config_rejects_account_scope_keys(
         self, home: Path, clean_env: None, tmp_path: Path
     ) -> None:
@@ -1103,19 +1120,33 @@ class TestInitCommand:
             _persist_default_path_aliases,
             _populate_project_catalog,
         )
+        from inspire.platform.web.browser_api.files import FileDirectoryInfo
         from inspire.platform.web.browser_api.projects import ProjectInfo
 
         project = ProjectInfo(
             project_id="project-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
             name="CI-情境智能-探索课题",
             workspace_id="ws-11111111-1111-1111-1111-111111111111",
+            en_name="exploration-topic",
         )
         project_catalog: dict[str, dict[str, str]] = {}
 
         class BrowserApi:
             @staticmethod
-            def get_train_job_workdir(**_: object) -> str:
-                return "/inspire/hdd/project/exploration-topic/tongjingqi-CZXS25110029"
+            def list_project_file_directories(**_: object) -> list[FileDirectoryInfo]:
+                return [
+                    FileDirectoryInfo(
+                        name="CI-情境智能-探索课题",
+                        directory="/inspire/hdd/project/exploration-topic/public",
+                    ),
+                    FileDirectoryInfo(
+                        name="CI-情境智能-探索课题",
+                        directory=(
+                            "/inspire/hdd/project/exploration-topic/"
+                            "tongjingqi-CZXS25110029"
+                        ),
+                    ),
+                ]
 
         _populate_project_catalog(
             project_catalog=project_catalog,
@@ -1143,6 +1174,59 @@ class TestInitCommand:
             "/inspire/ssd/project/exploration-topic/tongjingqi-CZXS25110029/"
         )
         assert aliases["global-me"] == "/inspire/ssd/global_user/tongjingqi-CZXS25110029/"
+
+    def test_project_catalog_uses_file_directory_api_for_personal_directory(
+        self,
+    ) -> None:
+        from inspire.cli.commands.init.discover import _populate_project_catalog
+        from inspire.platform.web.browser_api.files import FileDirectoryInfo
+        from inspire.platform.web.browser_api.projects import ProjectInfo
+
+        project = ProjectInfo(
+            project_id="project-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            name="CI-情境智能-探索课题",
+            workspace_id="ws-11111111-1111-1111-1111-111111111111",
+            en_name="exploration-topic",
+        )
+        project_catalog: dict[str, dict[str, str]] = {}
+        calls: list[tuple[str, dict[str, object]]] = []
+
+        class BrowserApi:
+            @staticmethod
+            def list_project_file_directories(**kwargs: object) -> list[FileDirectoryInfo]:
+                calls.append(("list_project_file_directories", kwargs))
+                return [
+                    FileDirectoryInfo(
+                        name="CI-情境智能-探索课题",
+                        directory="/inspire/hdd/project/exploration-topic/public",
+                    ),
+                    FileDirectoryInfo(
+                        name="CI-情境智能-探索课题",
+                        directory=(
+                            "/inspire/hdd/project/exploration-topic/"
+                            "tongjingqi-CZXS25110029"
+                        ),
+                    ),
+                ]
+
+            @staticmethod
+            def get_train_job_workdir(**kwargs: object) -> str:
+                calls.append(("get_train_job_workdir", kwargs))
+                return "/inspire/hdd/project/exploration-topic/253108120116"
+
+        _populate_project_catalog(
+            project_catalog=project_catalog,
+            projects=[project],
+            browser_api_module=BrowserApi,
+            session=object(),
+            workspace_id=project.workspace_id,
+            account_key="253108120116",
+            force=True,
+        )
+
+        assert [name for name, _ in calls] == ["list_project_file_directories"]
+        assert project_catalog[project.project_id]["path"] == "exploration-topic"
+        assert project_catalog[project.project_id]["path_user"] == "tongjingqi-CZXS25110029"
 
     def _setup_discover_mocks(
         self,
@@ -1226,8 +1310,8 @@ class TestInitCommand:
         )
         monkeypatch.setattr(
             browser_api_module,
-            "get_train_job_workdir",
-            lambda **_: "/inspire/hdd/project/p1",
+            "list_project_file_directories",
+            lambda **_: [],
         )
 
         # Stub out _ensure_playwright_browser and _ensure_ssh_key so they never

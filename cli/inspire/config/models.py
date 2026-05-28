@@ -86,9 +86,9 @@ class Config:
     # `inspire config context`).
     # project_id -> metadata dict (best-effort, schema may evolve)
     project_catalog: dict[str, dict[str, Any]] = field(default_factory=dict)
-    # project_id -> discovered workdir (best-effort; may come from API)
+    # Legacy project_id -> discovered workdir field; new path aliases use project_catalog.
     project_workdirs: dict[str, str] = field(default_factory=dict)
-    # Account-level train job workdir (if available)
+    # Legacy account-level train job workdir field.
     account_train_job_workdir: Optional[str] = None
 
     # Notebook settings

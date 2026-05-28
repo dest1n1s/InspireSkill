@@ -150,9 +150,9 @@ def _normalize_project_catalog(raw_value: Any) -> dict[str, dict[str, Any]]:
             continue
 
         entry: dict[str, Any] = {}
-        # ``name`` and ``path`` are the name-only metadata agents consume
+        # ``name``, ``path`` and ``path_user`` are the name-only metadata agents consume
         # via ``inspire config context``.
-        for key in ("name", "path"):
+        for key in ("name", "path", "path_user"):
             value = raw_entry.get(key)
             if isinstance(value, str):
                 value = value.strip()

@@ -760,8 +760,8 @@ def _populate_project_catalog(
       the ``[projects]`` key but useful if a project gets renamed).
     * ``path``  — the ``<topic>`` segment of the shared-storage path
       (``/inspire/<tier>/project/<topic>/<path_user>/...``). Derived from the
-      platform's reported train_job workdir; agents need it to construct
-      remote paths for new repos under this project.
+      platform file browser's project directory catalog; agents need it to
+      construct remote paths for new repos under this project.
     * ``path_user`` — the platform filesystem personal-directory segment. This
       is not necessarily the login username, e.g. login ``253108120116`` may
       map to ``tongjingqi-CZXS25110029`` on shared storage.
@@ -770,6 +770,23 @@ def _populate_project_catalog(
     the storage tier + ``path_user``, and caching it made the account config
     noisy.
     """
+    _ = account_key
+    directory_cache: dict[str, list[Any]] = {}
+
+    def _directories_for_workspace(project_workspace_id: str) -> list[Any]:
+        if project_workspace_id not in directory_cache:
+            try:
+                directory_cache[project_workspace_id] = (
+                    browser_api_module.list_project_file_directories(
+                        workspace_id=project_workspace_id,
+                        session=session,
+                    )
+                    or []
+                )
+            except Exception:
+                directory_cache[project_workspace_id] = []
+        return directory_cache[project_workspace_id]
+
     for project in projects:
         project_id = str(getattr(project, "project_id", "") or "").strip()
         if not project_id:
@@ -782,29 +799,60 @@ def _populate_project_catalog(
 
         project_workspace_id = str(getattr(project, "workspace_id", "") or workspace_id).strip()
         existing_path = str(entry.get("path") or "").strip()
-        if existing_path and not force:
+        existing_path_user = str(entry.get("path_user") or "").strip()
+        if existing_path and existing_path_user and not force:
             continue
 
-        try:
-            workdir = (
-                browser_api_module.get_train_job_workdir(
-                    project_id=project_id,
-                    workspace_id=project_workspace_id,
-                    session=session,
-                )
-                or ""
-            ).strip()
-        except Exception:
-            workdir = ""
-
-        if not workdir:
-            continue
-
-        topic, path_user = _parse_project_workdir(workdir)
+        topic, path_user = _match_project_file_directory(
+            project=project,
+            entry=entry,
+            directories=_directories_for_workspace(project_workspace_id),
+        )
         if topic:
             entry["path"] = topic
         if path_user:
             entry["path_user"] = path_user
+
+
+def _match_project_file_directory(
+    *,
+    project: Any,
+    entry: dict[str, Any],
+    directories: list[Any],
+) -> tuple[str | None, str | None]:
+    parsed: list[tuple[str, str | None, str]] = []
+    for item in directories:
+        directory = str(getattr(item, "directory", "") or "").strip()
+        topic, path_user = _parse_project_workdir(directory)
+        if not topic:
+            continue
+        parsed.append((topic, path_user, str(getattr(item, "name", "") or "").strip()))
+
+    if not parsed:
+        return None, None
+
+    en_name = str(getattr(project, "en_name", "") or "").strip()
+    existing_path = str(entry.get("path") or "").strip()
+    project_name = str(getattr(project, "name", "") or "").strip()
+
+    matches: list[tuple[str, str | None, str]] = []
+    for topic_hint in (en_name, existing_path):
+        if topic_hint:
+            matches = [item for item in parsed if item[0] == topic_hint]
+            if matches:
+                break
+    if not matches and project_name:
+        name_matches = [item for item in parsed if item[2] == project_name]
+        topics = {item[0] for item in name_matches}
+        if len(topics) == 1:
+            matches = name_matches
+
+    if not matches:
+        return None, None
+
+    topic = matches[0][0]
+    path_user = next((item[1] for item in matches if item[1]), None)
+    return topic, path_user
 
 
 def _parse_project_workdir(workdir: str) -> tuple[str | None, str | None]:
@@ -817,6 +865,8 @@ def _parse_project_workdir(workdir: str) -> tuple[str | None, str | None]:
 
     topic = parts[idx + 1] if idx + 1 < len(parts) else None
     path_user = parts[idx + 2] if idx + 2 < len(parts) else None
+    if path_user == "public":
+        path_user = None
     return topic, path_user
 
 
@@ -1148,9 +1198,9 @@ def _persist_default_path_aliases(
 def _prompt_storage_tier(current_path: str) -> str:
     """Ask the user to pick an Inspire storage tier.
 
-    The platform API's ``/train_job/workdir`` historically returns an
-    ``/inspire/hdd/...`` path — and HDD filesets are commonly 100% full
-    on busy projects, so that default is frequently wrong. Strategy:
+    The file browser catalog commonly includes an ``/inspire/hdd/...`` path,
+    and HDD filesets are often 100% full on busy projects, so that default is
+    frequently wrong. Strategy:
 
     - If the catalog-suggested path already points to ssd / qb-ilm /
       qb-ilm2, trust it and use that as the pre-selected default.

@@ -28,6 +28,15 @@ from .jobs import (
     list_jobs,
     list_train_job_logs,
 )
+from .files import (
+    FileDirectoryInfo,
+    SystemStorageInfo,
+    WebDAVConnectionInfo,
+    get_sftpgo_connection_info,
+    list_file_directories,
+    list_project_file_directories,
+    list_system_storage_types,
+)
 from .hpc_jobs import (
     HPCJobInfo,
     delete_hpc_job,
@@ -162,6 +171,14 @@ __all__ = [
     "list_job_users",
     "list_jobs",
     "list_train_job_logs",
+    # Files
+    "FileDirectoryInfo",
+    "SystemStorageInfo",
+    "WebDAVConnectionInfo",
+    "get_sftpgo_connection_info",
+    "list_file_directories",
+    "list_project_file_directories",
+    "list_system_storage_types",
     # HPC jobs
     "HPCJobInfo",
     "delete_hpc_job",

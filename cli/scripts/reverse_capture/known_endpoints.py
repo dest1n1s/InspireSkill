@@ -36,6 +36,11 @@ KNOWN: set[tuple[str, str]] = {
     ("GET", "/api/v1/project/{id}"),
     ("GET", "/api/v1/project/owners"),
 
+    # --- Files ---
+    ("POST", "/api/v1/file/get_system_storage_type_list"),
+    ("POST", "/api/v1/file/dir/list"),
+    ("POST", "/api/v1/file/sftpgo/connection_info"),
+
     # --- Notebook ---
     ("POST", "/api/v1/notebook/create"),
     ("POST", "/api/v1/notebook/users"),
