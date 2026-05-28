@@ -37,7 +37,8 @@ def image():
 
     \b
     Examples:
-        inspire image list                              # List official images
+        inspire image list                              # List all visible images
+        inspire image list --source public              # List public images
         inspire image list --source private             # List personal-visible images
         inspire image save <notebook-name> --workspace CPU资源空间 -n my-img
         inspire image save <notebook-name> --workspace CPU资源空间 -n shared --visibility public

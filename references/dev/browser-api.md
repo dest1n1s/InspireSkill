@@ -115,7 +115,7 @@ Chrome bundle 还定义了这些文件操作入口，当前 CLI 不封装 destru
 
 | 方法 | 路径 | 用途 | CLI 引用 |
 | --- | --- | --- | --- |
-| `POST` | `{prefix}/image/list` | 按 `source` / `visibility` / `registry_hint` 筛镜像 | `browser_api.images.list_images_by_source`；`inspire image list --source {public,private,official,all}` |
+| `POST` | `{prefix}/image/list` | 按 `source` / `visibility` / `registry_hint` 筛镜像；CLI 默认 fanout 到 `official`、`public`、`private` 三个可见来源 | `browser_api.images.list_images_by_source`；`inspire image list --source {public,private,official,all}` |
 | `GET` | `{prefix}/image/{image_id}` | 镜像详情 | `browser_api.images.get_image_detail`；`inspire image detail` |
 | `POST` | `{prefix}/image/create` | 注册外部镜像地址 | `browser_api.images.create_image`；`inspire image register` |
 | `POST` | `{prefix}/mirror/save` | 把运行中的 notebook 存成私有镜像 | `browser_api.images.save_notebook_as_image`；`inspire image save` |

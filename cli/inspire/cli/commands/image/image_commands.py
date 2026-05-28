@@ -119,7 +119,7 @@ def _dedupe_images_by_id(images: list[dict]) -> list[dict]:
     type=str,
     callback=_parse_source_value,
     metavar="[official|public|private|all]",
-    default="official",
+    default="all",
     show_default=True,
     help="Image source filter",
 )
@@ -132,10 +132,11 @@ def list_images_cmd(
 
     \b
     Examples:
-        inspire image list                     # Official images
+        inspire image list                     # All visible images
+        inspire image list --source public     # Public images
         inspire image list --source private    # Personal-visible images
-        inspire image list --source all        # All sources
-        inspire --json image list --source all # JSON output
+        inspire image list --source official   # Official images
+        inspire --json image list              # JSON output
     """
     session = require_web_session(
         ctx,

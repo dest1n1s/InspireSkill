@@ -31,8 +31,9 @@ inspire image <subcommand> --help
 
 ```bash
 inspire image list
+inspire image list --source public
 inspire image list --source private
-inspire image list --source all
+inspire image list --source official
 inspire image detail <name>:<version>
 ```
 

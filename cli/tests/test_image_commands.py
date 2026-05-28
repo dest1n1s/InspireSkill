@@ -268,32 +268,56 @@ def test_image_help_includes_subcommands() -> None:
 def test_image_list_human_output(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _patch_config_and_session(monkeypatch, tmp_path)
 
+    calls: list[str] = []
+
+    def fake_list_by_source(source="official", session=None):
+        calls.append(source)
+        if source == "official":
+            return [
+                browser_api_module.CustomImageInfo(
+                    image_id="img-001",
+                    url="registry/pytorch:2.0",
+                    name="pytorch",
+                    framework="PyTorch",
+                    version="2.0",
+                    source="SOURCE_OFFICIAL",
+                    status="READY",
+                    description="",
+                    created_at="",
+                )
+            ]
+        if source == "public":
+            return [
+                browser_api_module.CustomImageInfo(
+                    image_id="img-pub-001",
+                    url="registry/lyz-dev:100",
+                    name="lyz-dev:100",
+                    framework="PyTorch",
+                    version="100",
+                    source="SOURCE_PUBLIC",
+                    status="SUCCESS",
+                    description="",
+                    created_at="",
+                )
+            ]
+        return []
+
     monkeypatch.setattr(
         browser_api_module,
         "list_images_by_source",
-        lambda source="official", session=None: [
-            browser_api_module.CustomImageInfo(
-                image_id="img-001",
-                url="registry/pytorch:2.0",
-                name="pytorch",
-                framework="PyTorch",
-                version="2.0",
-                source="SOURCE_OFFICIAL",
-                status="READY",
-                description="",
-                created_at="",
-            )
-        ],
+        fake_list_by_source,
     )
 
     runner = CliRunner()
     result = runner.invoke(cli_main, ["image", "list"])
     assert result.exit_code == 0
+    assert calls == ["official", "public", "private"]
     assert "pytorch" in result.output
+    assert "lyz-dev:100" in result.output
     assert "2.0" in result.output
     assert "official" in result.output
     assert "READY" in result.output
-    assert "Total: 1 image(s)" in result.output
+    assert "Total: 2 image(s)" in result.output
 
 
 def test_image_list_json_output(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
