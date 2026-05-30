@@ -14,7 +14,7 @@
 #   curl -fsSL .../install.sh | bash -s -- --no-schedule
 #
 # Flags:
-#   --harness claude[,codex,gemini,openclaw,opencode,qoder]
+#   --harness claude[,codex,antigravity,cursor,openclaw,opencode,qoder]
 #                                     explicit harness list (default: auto-detect)
 #   --no-cli                          skip installing the Python package (skill-only)
 #   --no-schedule                     skip the macOS launchd update-check agent
@@ -61,7 +61,8 @@ detect_harnesses() {
   local found=()
   [[ -d "$HOME/.claude"                                      ]] && found+=("claude")
   [[ -d "$HOME/.codex"                                       ]] && found+=("codex")
-  [[ -d "$HOME/.gemini"                                      ]] && found+=("gemini")
+  [[ -d "$HOME/.gemini"                                      ]] && found+=("antigravity")
+  [[ -d "$HOME/.cursor"                                      ]] && found+=("cursor")
   [[ -d "$HOME/.openclaw"                                    ]] && found+=("openclaw")
   [[ -d "${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}"     ]] && found+=("opencode")
   [[ -d "$HOME/.qoder"                                       ]] && found+=("qoder")
@@ -71,15 +72,15 @@ detect_harnesses() {
 if [[ -z "$HARNESSES" ]]; then
   HARNESSES="$(detect_harnesses)"
   [[ -n "$HARNESSES" ]] \
-    || die "no agent harness detected (checked \$HOME/.claude, .codex, .gemini, .openclaw, \$OPENCODE_CONFIG_DIR or \$HOME/.config/opencode, and .qoder). Pass --harness explicitly."
+    || die "no agent harness detected (checked \$HOME/.claude, .codex, .gemini, .cursor, .openclaw, \$OPENCODE_CONFIG_DIR or \$HOME/.config/opencode, and .qoder). Pass --harness explicitly."
   log "auto-detected harnesses: $(bold "$HARNESSES")"
 fi
 
 IFS=',' read -r -a HARNESS_LIST <<<"$HARNESSES"
 for h in "${HARNESS_LIST[@]}"; do
   case "$h" in
-    claude|codex|gemini|openclaw|opencode|qoder) ;;
-    *) die "unknown harness: $h (pick from claude,codex,gemini,openclaw,opencode,qoder)" ;;
+    claude|codex|antigravity|cursor|openclaw|opencode|qoder) ;;
+    *) die "unknown harness: $h (pick from claude,codex,antigravity,cursor,openclaw,opencode,qoder)" ;;
   esac
 done
 
@@ -218,7 +219,8 @@ install_skill() {
   case "$harness" in
     claude)   target="$HOME/.claude/skills/inspire"                                    ;;
     codex)    target="$HOME/.codex/skills/inspire"                                     ;;
-    gemini)   target="$HOME/.gemini/skills/inspire"                                    ;;
+    antigravity) target="$HOME/.gemini/config/skills/inspire"                          ;;
+    cursor)   target="$HOME/.cursor/skills/inspire"                                    ;;
     openclaw) target="$HOME/.openclaw/skills/inspire"                                  ;;
     opencode) target="${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}/skills/inspire"   ;;
     qoder)    target="$HOME/.qoder/skills/inspire"                                     ;;

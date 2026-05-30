@@ -1,6 +1,6 @@
 """Render metric time-series into a PNG chart matching the platform 资源视图.
 
-Multimodal agents (Claude Code, Codex, Gemini CLI, …) can read the emitted
+Multimodal agents (Claude Code, Codex, Antigravity, Cursor, …) can read the emitted
 PNG directly via their image-capable Read tool, so keeping the visual output
 compact and chart-style is the cheapest way to give them the same signal a
 human reads off the web chart. See `notebook_metrics.py` (and the parallel

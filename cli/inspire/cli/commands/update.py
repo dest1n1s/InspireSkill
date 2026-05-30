@@ -38,10 +38,12 @@ import click
 
 from inspire import __version__
 from inspire.cli.utils.update_notice import (
+    REPO_SLUG,
     PACKAGE_NAME,
     TARBALL_URL,
     run_check,
     _is_newer,
+    _version_tuple,
 )
 from inspire.accounts.normalize import (
     _install_playwright_chromium,
@@ -61,7 +63,8 @@ def _opencode_config_dir() -> Path:
 HARNESS_SKILL_DIRS = {
     "claude": Path.home() / ".claude" / "skills" / "inspire",
     "codex": Path.home() / ".codex" / "skills" / "inspire",
-    "gemini": Path.home() / ".gemini" / "skills" / "inspire",
+    "antigravity": Path.home() / ".gemini" / "config" / "skills" / "inspire",
+    "cursor": Path.home() / ".cursor" / "skills" / "inspire",
     "openclaw": Path.home() / ".openclaw" / "skills" / "inspire",
     "opencode": _opencode_config_dir() / "skills" / "inspire",
     "qoder": Path.home() / ".qoder" / "skills" / "inspire",
@@ -69,7 +72,8 @@ HARNESS_SKILL_DIRS = {
 HARNESS_ROOTS = {
     "claude": Path.home() / ".claude",
     "codex": Path.home() / ".codex",
-    "gemini": Path.home() / ".gemini",
+    "antigravity": Path.home() / ".gemini",
+    "cursor": Path.home() / ".cursor",
     "openclaw": Path.home() / ".openclaw",
     "opencode": _opencode_config_dir(),
     "qoder": Path.home() / ".qoder",
@@ -119,6 +123,7 @@ _UV_TOOL_LINE_RE = re.compile(
 )
 _UV_TOOL_EXEC_RE = re.compile(r"^-\s+inspire(?:\s+\((?P<path>[^)]+)\))?")
 _VERSION_OUTPUT_RE = re.compile(r"\bversion\s+([0-9][^\s]*)")
+GITHUB_RELEASES_API_URL = f"https://api.github.com/repos/{REPO_SLUG}/releases"
 
 
 @dataclass(frozen=True)
@@ -132,6 +137,13 @@ class UvToolInfo:
 @dataclass(frozen=True)
 class PipxToolInfo:
     version: str | None = None
+
+
+@dataclass(frozen=True)
+class ReleaseEntry:
+    tag: str
+    body: str
+    url: str | None = None
 
 
 def _detect_harnesses() -> list[str]:
@@ -711,7 +723,7 @@ def _refresh_skill_files(silent: bool, *, latest_version: str | None = None) -> 
         if not silent:
             click.secho(
                 "! No agent harness detected "
-                "(checked ~/.claude, ~/.codex, ~/.gemini, ~/.openclaw, "
+                "(checked ~/.claude, ~/.codex, ~/.gemini, ~/.cursor, ~/.openclaw, "
                 "$OPENCODE_CONFIG_DIR or ~/.config/opencode, and ~/.qoder); "
                 "skipping SKILL refresh.",
                 fg="yellow",
@@ -779,6 +791,113 @@ def _refresh_skill_files(silent: bool, *, latest_version: str | None = None) -> 
                 click.secho(f"✓ refreshed skill → {target}", fg="green")
 
     return True
+
+
+def _normalize_release_version(version: str | None) -> str:
+    return (version or "").strip().lstrip("v")
+
+
+def _fetch_release_entries(timeout: int = 10) -> list[ReleaseEntry]:
+    entries: list[ReleaseEntry] = []
+    for page in range(1, 11):
+        req = urllib.request.Request(
+            f"{GITHUB_RELEASES_API_URL}?per_page=100&page={page}",
+            headers={
+                "Accept": "application/vnd.github+json",
+                "User-Agent": f"inspire-skill/{__version__}",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                payload = json.loads(resp.read().decode("utf-8", errors="replace"))
+        except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError):
+            return entries
+        if not isinstance(payload, list):
+            return entries
+        if not payload:
+            return entries
+
+        for item in payload:
+            if not isinstance(item, dict) or item.get("draft"):
+                continue
+            tag = item.get("tag_name")
+            if not isinstance(tag, str) or not tag.strip():
+                continue
+            body = item.get("body")
+            url = item.get("html_url")
+            entries.append(
+                ReleaseEntry(
+                    tag=tag.strip(),
+                    body=body if isinstance(body, str) else "",
+                    url=url if isinstance(url, str) else None,
+                )
+            )
+        if len(payload) < 100:
+            return entries
+    return entries
+
+
+def _release_entries_between(
+    entries: list[ReleaseEntry],
+    *,
+    previous_version: str,
+    new_version: str,
+) -> list[ReleaseEntry]:
+    previous = _normalize_release_version(previous_version)
+    new = _normalize_release_version(new_version)
+    if not previous or not new or not _is_newer(new, previous):
+        return []
+
+    selected = [
+        entry
+        for entry in entries
+        if _is_newer(_normalize_release_version(entry.tag), previous)
+        and not _is_newer(_normalize_release_version(entry.tag), new)
+    ]
+    return sorted(
+        selected,
+        key=lambda entry: _version_tuple(_normalize_release_version(entry.tag)),
+        reverse=True,
+    )
+
+
+def _release_body_for_display(body: str) -> str:
+    lines = body.strip().splitlines()
+    if lines and lines[0].strip() == "## 更新内容":
+        lines = lines[1:]
+    while lines and not lines[0].strip():
+        lines = lines[1:]
+    while lines and not lines[-1].strip():
+        lines = lines[:-1]
+    return "\n".join(lines)
+
+
+def _print_release_summary(previous_version: str, new_version: str, *, silent: bool) -> None:
+    if silent or not _is_newer(new_version, previous_version):
+        return
+
+    entries = _release_entries_between(
+        _fetch_release_entries(),
+        previous_version=previous_version,
+        new_version=new_version,
+    )
+    if not entries:
+        click.secho(
+            f"! 未能获取 v{previous_version} 到 v{new_version} 的 GitHub Release 更新内容。",
+            fg="yellow",
+            err=True,
+        )
+        return
+
+    click.echo()
+    click.secho(f"更新内容（v{previous_version} → v{new_version}）", bold=True)
+    for entry in entries:
+        version = _normalize_release_version(entry.tag)
+        body = _release_body_for_display(entry.body)
+        click.echo()
+        click.secho(f"v{version}", bold=True)
+        if body:
+            click.echo(body)
 
 
 def _parse_version_output(output: str) -> str | None:
@@ -995,3 +1114,8 @@ def update(check_only: bool, silent: bool, cli_only: bool, skill_only: bool) -> 
 
     if not silent:
         click.secho("✓ InspireSkill updated.", fg="green", bold=True)
+
+    if not skill_only:
+        previous_version = str(pre.get("current") or __version__)
+        new_version = str(actual_version or pre.get("latest") or __version__)
+        _print_release_summary(previous_version, new_version, silent=silent)

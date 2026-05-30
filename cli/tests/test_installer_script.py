@@ -22,6 +22,8 @@ def test_installer_first_uv_install_without_inspire_on_path(tmp_path: Path) -> N
     bin_dir.mkdir()
 
     (home / ".codex").mkdir()
+    (home / ".gemini").mkdir()
+    (home / ".cursor").mkdir()
     (bin_dir / "uv").write_text(
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
@@ -42,7 +44,7 @@ def test_installer_first_uv_install_without_inspire_on_path(tmp_path: Path) -> N
         encoding="utf-8",
     )
     (bin_dir / "uv").chmod(0o755)
-    (bin_dir / "curl").write_text("#!/usr/bin/env bash\nprintf 'fake-tarball'\n", encoding="utf-8")
+    (bin_dir / "curl").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
     (bin_dir / "curl").chmod(0o755)
     (bin_dir / "tar").write_text(
         "#!/usr/bin/env bash\n"
@@ -64,7 +66,13 @@ def test_installer_first_uv_install_without_inspire_on_path(tmp_path: Path) -> N
         "INSPIRE_SKIP_UPDATE_CHECK": "1",
     }
     result = subprocess.run(
-        ["bash", str(installer), "--harness", "codex,qoder", "--no-schedule"],
+        [
+            "bash",
+            str(installer),
+            "--harness",
+            "codex,antigravity,cursor,qoder",
+            "--no-schedule",
+        ],
         cwd=installer.parent.parent,
         env=env,
         text=True,
@@ -75,4 +83,17 @@ def test_installer_first_uv_install_without_inspire_on_path(tmp_path: Path) -> N
     assert result.returncode == 0, result.stderr + result.stdout
     assert "unbound variable" not in result.stderr
     assert (home / ".codex" / "skills" / "inspire" / "SKILL.md").exists()
+    assert (home / ".gemini" / "config" / "skills" / "inspire" / "SKILL.md").exists()
+    assert not (home / ".gemini" / "skills" / "inspire").exists()
+    assert (home / ".cursor" / "skills" / "inspire" / "SKILL.md").exists()
     assert (home / ".qoder" / "skills" / "inspire" / "SKILL.md").exists()
+
+
+def test_installer_advertises_antigravity_not_gemini_cli() -> None:
+    installer = Path(__file__).resolve().parents[1].parent / "scripts" / "install.sh"
+    text = installer.read_text(encoding="utf-8")
+
+    assert "antigravity" in text
+    assert "cursor" in text
+    assert "gemini)" not in text
+    assert ".gemini/skills/inspire" not in text

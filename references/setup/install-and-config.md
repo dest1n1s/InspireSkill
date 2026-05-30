@@ -32,6 +32,8 @@ curl -fsSL https://raw.githubusercontent.com/realZillionX/InspireSkill/main/scri
 ```bash
 curl -fsSL .../install.sh | bash -s -- --harness claude
 curl -fsSL .../install.sh | bash -s -- --harness claude,codex
+curl -fsSL .../install.sh | bash -s -- --harness antigravity
+curl -fsSL .../install.sh | bash -s -- --harness cursor
 curl -fsSL .../install.sh | bash -s -- --harness qoder
 curl -fsSL .../install.sh | bash -s -- --no-cli
 curl -fsSL .../install.sh | bash -s -- --no-schedule
@@ -56,6 +58,7 @@ inspire update --skill-only   # 仅刷 SKILL.md / references/
 
 `inspire update` 会自动识别当前安装由 `uv tool` 还是 `pipx` 管理，并调用对应升级命令。
 如果默认 PyPI 因网络或镜像问题超时，命令会自动尝试常见 PyPI 镜像。网络受限环境可提前检查 Clash 虚拟/TUN 网卡，或持久配置 `UV_DEFAULT_INDEX` / `PIP_INDEX_URL`。
+成功升级 CLI 后，命令会读取 GitHub Releases，并显示旧版本到新版本之间的 `## 更新内容` 摘要；`--silent` 和 `--skill-only` 不输出这段版本更新摘要。
 
 从 v3.0.3 之前的版本升级时，先重跑一次安装脚本：
 

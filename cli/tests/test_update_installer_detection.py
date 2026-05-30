@@ -33,8 +33,10 @@ from inspire.cli.commands.update import (
     _detect_installer,
     _ensure_global_playwright_runtime,
     _ensure_playwright_runtime,
+    _release_entries_between,
     _is_local_requirement,
     _parse_uv_tool_list,
+    ReleaseEntry,
     _scan_stale_skill_patterns,
     _upgrade_cli,
 )
@@ -76,17 +78,38 @@ def test_detect_installer_from_prefix(
     assert _detect_installer() == expected
 
 
-def test_detect_harnesses_includes_qoder(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_detect_harnesses_includes_antigravity_cursor_and_qoder(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     roots = {
         "claude": tmp_path / ".claude",
+        "antigravity": tmp_path / ".gemini",
+        "cursor": tmp_path / ".cursor",
         "qoder": tmp_path / ".qoder",
         "opencode": tmp_path / ".config" / "opencode",
     }
     roots["claude"].mkdir()
+    roots["antigravity"].mkdir()
+    roots["cursor"].mkdir()
     roots["qoder"].mkdir()
     monkeypatch.setattr(update_module, "HARNESS_ROOTS", roots)
 
-    assert update_module._detect_harnesses() == ["claude", "qoder"]
+    assert update_module._detect_harnesses() == ["claude", "antigravity", "cursor", "qoder"]
+
+
+def test_antigravity_skill_dir_uses_google_global_config_path() -> None:
+    assert update_module.HARNESS_SKILL_DIRS["antigravity"] == (
+        Path.home() / ".gemini" / "config" / "skills" / "inspire"
+    )
+    assert "gemini" not in update_module.HARNESS_SKILL_DIRS
+    assert "gemini" not in update_module.HARNESS_ROOTS
+
+
+def test_cursor_skill_dir_uses_cursor_global_skills_path() -> None:
+    assert update_module.HARNESS_SKILL_DIRS["cursor"] == (
+        Path.home() / ".cursor" / "skills" / "inspire"
+    )
 
 
 def test_upgrade_cli_retries_pypi_network_errors_with_mirrors(
@@ -303,6 +326,67 @@ def test_update_runs_global_runtime_setup_after_cli_upgrade(
     )
 
     assert calls == ["cli:4.1.1", "skills", "audit", "runtime", "normalize"]
+
+
+def test_release_entries_between_includes_versions_between_old_and_new() -> None:
+    entries = _release_entries_between(
+        [
+            ReleaseEntry(tag="v5.2.3", body="## 更新内容\n\n### 新增\n\n- C"),
+            ReleaseEntry(tag="v5.2.2", body="## 更新内容\n\n### 新增\n\n- B"),
+            ReleaseEntry(tag="v5.2.1", body="## 更新内容\n\n### 修复\n\n- A"),
+        ],
+        previous_version="5.2.1",
+        new_version="5.2.3",
+    )
+
+    assert [(entry.tag, entry.body.strip()) for entry in entries] == [
+        ("v5.2.3", "## 更新内容\n\n### 新增\n\n- C"),
+        ("v5.2.2", "## 更新内容\n\n### 新增\n\n- B"),
+    ]
+
+
+def test_update_prints_release_summary_after_successful_cli_upgrade(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    calls: list[str] = []
+
+    def fake_run_check(**kwargs):
+        calls.append(f"check:{kwargs.get('current_version')}")
+        if kwargs.get("current_version"):
+            return {"current": kwargs.get("current_version"), "latest": "5.2.3"}
+        return {"current": "5.2.1", "latest": "5.2.3"}
+
+    monkeypatch.setattr(update_module, "run_check", fake_run_check)
+    monkeypatch.setattr(update_module, "_print_status", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(update_module, "_upgrade_cli", lambda *args, **_kwargs: True)
+    monkeypatch.setattr(update_module, "_refresh_skill_files", lambda *args, **_kwargs: True)
+    monkeypatch.setattr(update_module, "_audit_update_state", lambda **_kwargs: (True, "5.2.3"))
+    monkeypatch.setattr(update_module, "_ensure_global_playwright_runtime", lambda silent: True)
+    monkeypatch.setattr(
+        update_module,
+        "_fetch_release_entries",
+        lambda: [
+            ReleaseEntry(tag="v5.2.3", body="## 更新内容\n\n### 新增\n\n- 新增 Cursor Harness 支持。"),
+            ReleaseEntry(tag="v5.2.2", body="## 更新内容\n\n### 修复\n\n- 修复 Antigravity 安装目录。"),
+            ReleaseEntry(tag="v5.2.1", body="## 更新内容\n\n### 新增\n\n- Qoder。"),
+        ],
+    )
+    monkeypatch.setattr("inspire.accounts.normalize_environment", lambda **_kwargs: None)
+
+    update_module.update.callback(
+        check_only=False,
+        silent=False,
+        cli_only=False,
+        skill_only=False,
+    )
+
+    output = capsys.readouterr().out
+    assert "更新内容（v5.2.1 → v5.2.3）" in output
+    assert "v5.2.3" in output
+    assert "新增 Cursor Harness 支持" in output
+    assert "v5.2.2" in output
+    assert "修复 Antigravity 安装目录" in output
 
 
 def test_parse_uv_tool_list_captures_local_source_and_executable() -> None:
