@@ -127,6 +127,10 @@ _UV_TOOL_LINE_RE = re.compile(
 _UV_TOOL_EXEC_RE = re.compile(r"^-\s+inspire(?:\s+\((?P<path>[^)]+)\))?")
 _VERSION_OUTPUT_RE = re.compile(r"\bversion\s+([0-9][^\s]*)")
 GITHUB_RELEASES_API_URL = f"https://api.github.com/repos/{REPO_SLUG}/releases"
+_CHANGELOG_RELEASE_HEADING_RE = re.compile(
+    r"^#\s+(?P<tag>v?\d+(?:\.\d+){1,3}(?:[A-Za-z0-9._+-]*)?)\s*$",
+    re.MULTILINE,
+)
 
 
 @dataclass(frozen=True)
@@ -655,7 +659,7 @@ def _run_post_update_command(
     return proc.returncode == 0
 
 
-def _download_tarball(timeout: int = 30) -> bytes | None:
+def _download_tarball(timeout: int = 30, *, silent: bool = False) -> bytes | None:
     req = urllib.request.Request(
         TARBALL_URL,
         headers={"User-Agent": f"inspire-skill/{__version__}"},
@@ -664,7 +668,8 @@ def _download_tarball(timeout: int = 30) -> bytes | None:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return resp.read()
     except (urllib.error.URLError, TimeoutError, OSError) as e:
-        click.secho(f"✗ tarball fetch failed: {e}", fg="red", err=True)
+        if not silent:
+            click.secho(f"✗ tarball fetch failed: {e}", fg="red", err=True)
         return None
 
 
@@ -874,7 +879,7 @@ def _normalize_release_version(version: str | None) -> str:
     return (version or "").strip().lstrip("v")
 
 
-def _fetch_release_entries(timeout: int = 10) -> list[ReleaseEntry]:
+def _fetch_release_entries_from_github(timeout: int = 10) -> list[ReleaseEntry]:
     entries: list[ReleaseEntry] = []
     for page in range(1, 11):
         req = urllib.request.Request(
@@ -912,6 +917,50 @@ def _fetch_release_entries(timeout: int = 10) -> list[ReleaseEntry]:
         if len(payload) < 100:
             return entries
     return entries
+
+
+def _release_entries_from_changelog_text(text: str) -> list[ReleaseEntry]:
+    matches = list(_CHANGELOG_RELEASE_HEADING_RE.finditer(text))
+    entries: list[ReleaseEntry] = []
+    for index, match in enumerate(matches):
+        tag = match.group("tag").strip()
+        body_start = match.end()
+        body_end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        body = text[body_start:body_end].strip()
+        entries.append(ReleaseEntry(tag=tag, body=body))
+    return entries
+
+
+def _changelog_text_from_tarball(tarball: bytes) -> str | None:
+    try:
+        with tarfile.open(fileobj=io.BytesIO(tarball), mode="r:gz") as tf:
+            for member in tf.getmembers():
+                if not member.isfile() or not member.name.endswith("/CHANGELOG.md"):
+                    continue
+                extracted = tf.extractfile(member)
+                if extracted is None:
+                    return None
+                return extracted.read().decode("utf-8", errors="replace")
+    except (tarfile.TarError, OSError):
+        return None
+    return None
+
+
+def _fetch_release_entries_from_changelog(timeout: int = 10) -> list[ReleaseEntry]:
+    tarball = _download_tarball(timeout=timeout, silent=True)
+    if tarball is None:
+        return []
+    text = _changelog_text_from_tarball(tarball)
+    if text is None:
+        return []
+    return _release_entries_from_changelog_text(text)
+
+
+def _fetch_release_entries(timeout: int = 10) -> list[ReleaseEntry]:
+    entries = _fetch_release_entries_from_github(timeout=timeout)
+    if entries:
+        return entries
+    return _fetch_release_entries_from_changelog(timeout=timeout)
 
 
 def _release_entries_between(

@@ -2,6 +2,15 @@
 
 本文件同步 GitHub Releases 正文格式；Release 页面是发布说明的标准口径。
 
+# v5.2.4
+
+## 更新内容
+
+### 修复
+
+- 修复 `inspire update` 在无法获取 GitHub Releases API 数据时不显示跨版本更新摘要的问题；现在会回退读取发布包中与 Releases 同步的 `CHANGELOG.md`。
+- 更新摘要继续以 GitHub Releases API 为第一来源，API 不可用时使用同一发布 tarball 的 `CHANGELOG.md` 兜底，避免成功升级后只看到“未能获取更新内容”的提示。
+
 # v5.2.3
 
 ## 更新内容

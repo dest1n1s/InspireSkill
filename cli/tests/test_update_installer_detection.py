@@ -399,6 +399,41 @@ def test_release_entries_between_includes_versions_between_old_and_new() -> None
     ]
 
 
+def test_release_entries_from_changelog_text_parses_release_sections() -> None:
+    entries = update_module._release_entries_from_changelog_text(
+        "# Changelog\n\n"
+        "本文件同步 GitHub Releases 正文格式。\n\n"
+        "# v5.2.3\n\n"
+        "## 更新内容\n\n"
+        "### 修复\n\n"
+        "- 修复摘要兜底。\n\n"
+        "# v5.2.2\n\n"
+        "## 更新内容\n\n"
+        "### 新增\n\n"
+        "- 新增 Cursor。\n"
+    )
+
+    assert [(entry.tag, entry.body.strip()) for entry in entries] == [
+        ("v5.2.3", "## 更新内容\n\n### 修复\n\n- 修复摘要兜底。"),
+        ("v5.2.2", "## 更新内容\n\n### 新增\n\n- 新增 Cursor。"),
+    ]
+
+
+def test_fetch_release_entries_falls_back_to_changelog_when_github_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fallback_entries = [ReleaseEntry(tag="v5.2.3", body="## 更新内容\n\n- 兜底摘要。")]
+
+    monkeypatch.setattr(update_module, "_fetch_release_entries_from_github", lambda timeout=10: [])
+    monkeypatch.setattr(
+        update_module,
+        "_fetch_release_entries_from_changelog",
+        lambda timeout=10: fallback_entries,
+    )
+
+    assert update_module._fetch_release_entries() == fallback_entries
+
+
 def test_update_prints_release_summary_after_successful_cli_upgrade(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
