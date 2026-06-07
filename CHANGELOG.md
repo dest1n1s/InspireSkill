@@ -2,6 +2,30 @@
 
 本文件同步 GitHub Releases 正文格式；Release 页面是发布说明的标准口径。
 
+# v6.0.1
+
+## 更新内容
+
+### 修复
+
+- 修复安装器完成后的下一步提示：账号和代理配置统一指向 `inspire account add <name>`，随后再运行 `inspire config show --compact`、`inspire init` 和资源可见性检查。
+- 修正 `inspire account add` 与首次 `inspire init` 的 proxy 提示，把 `http://127.0.0.1:7897` 明确标成 Clash mixed port 示例，不再暗示本机端口固定。
+- Browser API reverse-capture 开发脚本默认不再启用 `http://127.0.0.1:7897` 代理；需要代理时显式传 `--proxy http://127.0.0.1:<mixed-port>` 或设置 `INSPIRE_PLAYWRIGHT_PROXY`。
+
+### 文档
+
+- 合并 `references/setup/proxy-setup.md` 到 `references/setup/install-and-config.md`，安装、更新、账号、项目初始化和 SII proxy setup 统一看一份文档。
+- SII Proxy 文档改为模板语义：本机 mixed port、SII 节点数量和节点端口都按使用者环境填写，不照抄任何本机配置。
+- Clash Verge `SII Proxy` 组改为 `select` 模板，并加入 `DIRECT` 选项；公网环境可选 SII proxy 节点，能直连 SII 校园网时可选 `DIRECT`。
+- README 和开发文档同步更新，避免把 `7897` 写成 CLI 绑定端口或默认代理事实。
+
+### 验证
+
+- `uv run pytest tests/test_account_commands.py tests/test_config_files.py -q`
+- `uv run pytest tests/test_init_command.py tests/test_cli_help_boundaries.py tests/test_main_help.py -q`
+- `uv run ruff check inspire/cli/commands/account/add.py inspire/cli/commands/init/init_cmd.py inspire/cli/commands/init/templates.py scripts/reverse_capture/capture.py`
+- `git diff --check`
+
 # v6.0.0
 
 ## 更新内容
