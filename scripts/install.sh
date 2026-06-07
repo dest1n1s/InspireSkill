@@ -325,9 +325,10 @@ echo
 bold "InspireSkill installed."
 cat <<EOF
   1) Configure accounts & proxy:
-        inspire init
+        inspire account add <name>
   2) Verify auth and resource visibility:
         inspire config show --compact
+        inspire init
         inspire resources availability --workspace all --include-cpu
   3) Check / apply upgrades anytime:
         inspire update --check     # report only
