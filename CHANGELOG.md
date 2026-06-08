@@ -2,7 +2,7 @@
 
 本文件同步 GitHub Releases 正文格式；Release 页面是发布说明的标准口径。
 
-# Unreleased
+# v6.0.2
 
 ## 更新内容
 
@@ -11,6 +11,11 @@
 - 调整 `inspire init` 的 scope 语义：默认 `--scope global`，裸 `inspire init` 会执行全局发现，并把 project catalog、compute group catalog 和 `[path_aliases]` 等账号级发现结果写入 `~/.inspire/accounts/<account>/config.toml`。
 - `inspire init --scope project` 现在执行项目发现：刷新账号级 catalog，并把当前仓库的 `[context]` 与项目级 `[path_aliases]` 覆盖写入 `./.inspire/accounts/<account>/config.toml`；项目级 path alias 会覆盖账号级默认值。
 - 新增 `inspire init --no-discover`，用于跳过平台发现，只走旧的 env smart init / template config 写入路径。
+
+### 文档
+
+- 修正 README 里被误写成 `Agent` 的人类主体表述，区分用户、使用者和真正的 AI Agent / harness 执行体。
+- 重写 `SKILL.md` 的定位与按需加载索引：保留平台宏观判断、工作负载选型、网络 / 内部源 / 路径边界和 reference 路由，命令表面继续交给 CLI help。
 
 # v6.0.1
 
