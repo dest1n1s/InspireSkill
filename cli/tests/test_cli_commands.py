@@ -398,6 +398,47 @@ def test_job_create_json_output(monkeypatch: pytest.MonkeyPatch, tmp_path: Path)
     assert "quota_id" not in framework_config
     assert create_payload["logic_compute_group_id"]
     assert framework_config["resource_spec_price"]["quota_id"]
+    # No --max-time given: omit max_running_time_ms so the platform applies no
+    # time cap (a giant sentinel would overflow the backend's INT column).
+    assert "max_running_time_ms" not in create_payload
+
+
+def test_job_create_max_time_sets_running_time_ms(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    api = patch_config_and_auth(monkeypatch, tmp_path)
+    runner = CliRunner()
+
+    result = runner.invoke(
+        cli_main,
+        [
+            "--json",
+            "job",
+            "create",
+            "--name",
+            "test-job",
+            "--quota",
+            "1,20,200",
+            "--command",
+            "echo hi",
+            "--workspace",
+            "cpu",
+            "--project",
+            "proj",
+            "--group",
+            "H200 TestRoom",
+            "--image",
+            "registry.local/train:latest",
+            "--nodes",
+            "1",
+            "--max-time",
+            "24",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    create_payload = api.calls["create_training_job"]["payload"]
+    assert create_payload["max_running_time_ms"] == str(24 * 3600 * 1000)
 
 
 def test_wrap_in_bash():

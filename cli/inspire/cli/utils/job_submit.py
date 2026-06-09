@@ -23,7 +23,7 @@ class JobSubmission:
     result: Any
     log_path: Optional[str]
     wrapped_command: str
-    max_time_ms: str
+    max_time_ms: Optional[str]
 
 
 @dataclass(frozen=True)
@@ -33,7 +33,7 @@ class JobSubmissionPlan:
     create_kwargs: dict[str, Any]
     log_path: Optional[str]
     wrapped_command: str
-    max_time_ms: str
+    max_time_ms: Optional[str]
     project_name: Optional[str]
     workspace_id: str
     quota: ResolvedQuota
@@ -218,7 +218,7 @@ def build_training_job_plan(
     image: Optional[str],
     priority: int,
     nodes: int,
-    max_time_hours: float,
+    max_time_hours: Optional[float],
     project_name: Optional[str] = None,
     auto_fault_tolerance: Optional[bool] = None,
     fault_tolerance_max_retry: Optional[int] = None,
@@ -236,7 +236,7 @@ def build_training_job_plan(
         config, command=wrapped_command, name=name
     )
 
-    max_time_ms = str(int(max_time_hours * 3600 * 1000))
+    max_time_ms = str(int(max_time_hours * 3600 * 1000)) if max_time_hours is not None else None
 
     resource_spec_price = build_resource_spec_price(quota=quota)
     framework_config: dict[str, Any] = {
@@ -257,9 +257,11 @@ def build_training_job_plan(
         workspace_id=workspace_id,
         logic_compute_group_id=quota.logic_compute_group_id,
         task_priority=priority,
-        max_running_time_ms=max_time_ms,
         framework_config=[framework_config],
     )
+
+    if max_time_ms is not None:
+        create_kwargs["max_running_time_ms"] = max_time_ms
 
     if config.shm_size is not None:
         shm_size = int(config.shm_size)
@@ -330,7 +332,7 @@ def submit_training_job(
     image: Optional[str],
     priority: int,
     nodes: int,
-    max_time_hours: float,
+    max_time_hours: Optional[float],
     project_name: Optional[str] = None,
     auto_fault_tolerance: Optional[bool] = None,
     fault_tolerance_max_retry: Optional[int] = None,
