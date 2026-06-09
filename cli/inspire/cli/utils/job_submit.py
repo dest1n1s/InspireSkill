@@ -243,7 +243,6 @@ def build_training_job_plan(
         "image_type": "SOURCE_PRIVATE",
         "image": image,
         "instance_count": int(nodes),
-        "quota_id": quota.quota_id,
         "resource_spec_price": resource_spec_price,
         "cpu": quota.cpu_count,
         "gpu_count": quota.gpu_count,

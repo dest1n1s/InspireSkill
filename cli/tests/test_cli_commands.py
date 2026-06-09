@@ -387,10 +387,17 @@ def test_job_create_json_output(monkeypatch: pytest.MonkeyPatch, tmp_path: Path)
     assert data["data"]["name"] == "test-job"
     assert "job_id" not in data["data"]
     create_payload = api.calls["create_training_job"]["payload"]
-    assert create_payload["framework_config"][0]["exclude_nodes"] == [
+    framework_config = create_payload["framework_config"][0]
+    assert framework_config["exclude_nodes"] == [
         "qb-prod-gpu1736",
         "qb-prod-gpu1737",
     ]
+    # The backend CreateJob proto has no framework_config-level quota_id; the quota
+    # is conveyed by the top-level logic_compute_group_id plus the nested
+    # resource_spec_price (which carries its own quota_id).
+    assert "quota_id" not in framework_config
+    assert create_payload["logic_compute_group_id"]
+    assert framework_config["resource_spec_price"]["quota_id"]
 
 
 def test_wrap_in_bash():
